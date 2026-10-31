@@ -1,0 +1,92 @@
+@use 'pkg:enron/enron/a11y';
+@use 'theme';
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	font: 13px/1.5 theme.$font;
+	background: var(--bg);
+	color: var(--fg);
+	scrollbar-color: var(--line) transparent;
+	scrollbar-width: thin;
+}
+
+::selection {
+	background: var(--accent);
+	color: var(--bg);
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+	&:hover {
+		text-decoration: underline;
+	}
+}
+
+input,
+textarea,
+button {
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: 1px solid var(--line);
+	border-radius: 0;
+	padding: .3rem .6rem;
+	@include a11y.focus-visible(var(--accent), 1px, -1px);
+}
+
+// Touch devices: larger tap targets
+@media (pointer: coarse) {
+	button {
+		min-height: 2.25rem;
+		min-width: 2.25rem;
+		justify-content: center;
+	}
+}
+
+input {
+	accent-color: var(--accent);
+}
+
+input,
+textarea {
+	&:focus {
+		border-color: var(--accent);
+	}
+	&::placeholder {
+		color: var(--dim);
+	}
+}
+
+button {
+	cursor: pointer;
+	color: var(--accent);
+	background: var(--button);
+	border-color: transparent;
+	&:hover:not(:disabled) {
+		background: var(--accent);
+		color: var(--bg);
+	}
+	&:disabled {
+		color: var(--dim);
+		background: var(--panel);
+		cursor: wait;
+	}
+}
+
+.error {
+	color: var(--error);
+}
+
+.nick {
+	color: hsl(var(--hue, 0) 60% 65%);
+}

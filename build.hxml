@@ -1,6 +1,7 @@
--js web/rad.js
+-js build/rad.js
 -main rad.App
 -cp src
 -lib hxmpp
 -lib lit
 -dce full
+-D analyzer-optimize

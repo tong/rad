@@ -1,0 +1,228 @@
+@use 'pkg:enron/enron/break';
+@use 'pkg:enron/enron/layout';
+
+// `> div >`: elements of the template only, not of the settings within
+rad-chat {
+	display: grid;
+	// --player-width is set by dragging the player border
+	grid-template: auto minmax(0, 1fr) auto / var(--player-width, minmax(0, 3fr)) minmax(0, 2fr) fit-content(240px);
+	height: 100%;
+	height: 100dvh; // mobile: excludes the browser toolbars
+	padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
+
+	// Nothing playing: narrow player, more room for the chat
+	@include break.min(md) {
+		&:has(.screen:empty) {
+			grid-template-columns: var(--player-width, 20rem) minmax(0, 1fr) fit-content(240px);
+		}
+	}
+
+	> div > header {
+		grid-column: 1 / -1;
+		display: flex;
+		gap: 1rem;
+		align-items: center;
+		padding: .4rem 1rem;
+		padding-top: max(.4rem, env(safe-area-inset-top));
+		border-bottom: 1px solid var(--line);
+		background: var(--panel);
+
+		// Subject, then the room address if it fits on the line: else it wraps to the clipped second line
+		.title {
+			flex: 1;
+			min-width: 0;
+			display: flex;
+			flex-wrap: wrap;
+			column-gap: 1rem;
+			height: 1lh;
+			overflow: hidden;
+		}
+
+		h1 {
+			max-width: 100%;
+			margin: 0;
+			font-size: 1em;
+			color: var(--accent);
+			@include layout.no-text-overflow;
+		}
+
+		.room {
+			color: var(--dim);
+			&::before {
+				content: '# ';
+			}
+		}
+
+		.status {
+			flex: none;
+			color: var(--error);
+		}
+
+		// User count, instead of the user list on small screens
+		.count {
+			display: none;
+			flex: none;
+			color: var(--dim);
+		}
+
+		button {
+			padding: .1rem .6rem;
+		}
+	}
+
+	.log {
+		grid-area: 2 / 2;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: .7rem;
+		padding: .7rem 1rem;
+
+		// Consecutive messages of a sender: one name, joined bubbles, a line in the sender's color
+		.group {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 2px;
+			padding-left: .6rem;
+			border-left: 2px solid hsl(var(--hue) 60% 65%);
+		}
+
+		.nick {
+			font-size: .85em;
+			max-width: 100%;
+			@include layout.no-text-overflow;
+		}
+
+		p {
+			display: flex;
+			align-items: baseline;
+			gap: 1.5ch;
+			max-width: 100%;
+			margin: 0;
+			padding: .3rem .7rem;
+			background: hsl(var(--hue) 22% 13%);
+			white-space: pre-wrap;
+			overflow-wrap: anywhere;
+		}
+
+		time {
+			flex: none;
+			margin-left: auto;
+			font-size: .75em;
+			color: var(--dim);
+		}
+
+		// Playlist change: a line, no bubble
+		.action {
+			display: flex;
+			align-items: baseline;
+			gap: 1.5ch;
+			padding-left: calc(.6rem + 2px);
+			color: var(--dim);
+			white-space: pre-wrap;
+			overflow-wrap: anywhere;
+			.nick {
+				font-size: 1em;
+			}
+		}
+
+		.notice {
+			color: var(--dim);
+			font-style: italic;
+			border-color: var(--line);
+			.nick { color: var(--dim); }
+			p { background: var(--panel); }
+		}
+	}
+
+	> div > ul {
+		grid-area: 2 / 3 / 4;
+		margin: 0;
+		padding: .5rem 1rem;
+		list-style: none;
+		overflow-y: auto;
+		border-left: 1px solid var(--line);
+		background: var(--panel);
+		li {
+			@include layout.no-text-overflow;
+		}
+	}
+
+	// Behind the user list slid in on small screens
+	.backdrop {
+		display: none;
+	}
+
+	> div > form {
+		grid-area: 3 / 2;
+		display: flex;
+		align-items: flex-end; // send button stays at the bottom of a multiline input
+		gap: .5rem;
+		padding: .4rem 1rem;
+		padding-bottom: max(.4rem, env(safe-area-inset-bottom));
+		border-top: 1px solid var(--line);
+
+		// One line, grows with its content where field-sizing is supported
+		textarea {
+			flex: 1;
+			field-sizing: content;
+			max-height: 10lh;
+			border: 0;
+			padding-left: 0;
+			resize: none;
+			line-height: inherit;
+			&:focus-visible {
+				outline: none;
+			}
+		}
+	}
+
+	@include break.max(md) {
+		grid-template: auto auto minmax(0, 1fr) auto / minmax(0, 1fr);
+
+		// Slides in from the right, toggled by the user count
+		> div > ul {
+			position: fixed;
+			z-index: 3;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			width: min(16rem, 80vw);
+			padding: max(.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) 1rem;
+			transform: translateX(100%);
+			visibility: hidden;
+			transition: transform .2s, visibility .2s;
+			&.open {
+				transform: none;
+				visibility: visible;
+			}
+		}
+
+		.backdrop {
+			display: block;
+			position: fixed;
+			z-index: 2;
+			inset: 0;
+			background: rgb(0 0 0 / .5);
+		}
+
+		> div > header {
+			justify-content: space-between;
+			.count {
+				display: inline-flex;
+			}
+		}
+
+		.log {
+			grid-area: 3 / 1;
+		}
+
+		> div > form {
+			grid-area: 4 / 1;
+			textarea {
+				max-height: 4lh;
+			}
+		}
+	}
+}

@@ -1,0 +1,20 @@
+@use 'pkg:enron/enron/color';
+@use 'sass:color' as c;
+
+$bg: #0b0b0b;
+$fg: #c6c6c6;
+$accent: #a7b3bb; // cool gray
+$error: #ff5f5f;
+$font: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+
+:root {
+	color-scheme: dark;
+	--bg: #{$bg};
+	--panel: #{color.tint($bg, 4%)};
+	--line: #{color.tint($bg, 14%)};
+	--fg: #{$fg};
+	--dim: #{color.shade($fg, 45%)};
+	--accent: #{$accent};
+	--button: #{c.mix($accent, $bg, 16%)};
+	--error: #{$error};
+}

@@ -1,0 +1,44 @@
+@use 'pkg:enron/enron/break';
+@use 'pkg:enron/enron/layout';
+
+rad-login {
+	display: grid;
+	place-items: center;
+	min-height: 100%;
+	padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+
+rad-login form {
+	@include layout.stack(.6rem);
+	width: min(26rem, 100%);
+
+	label {
+		display: grid;
+		grid-template-columns: 6rem minmax(0, 1fr);
+		align-items: center;
+		color: var(--dim);
+		text-transform: uppercase;
+
+		// Small screens: label above the input
+		@include break.max(sm) {
+			grid-template-columns: minmax(0, 1fr);
+			gap: .2rem;
+		}
+	}
+
+	input {
+		width: 100%;
+		min-width: 0;
+		text-overflow: ellipsis;
+		text-transform: none; // inherited from the label
+	}
+
+	button {
+		align-self: flex-end;
+		margin-top: .5rem;
+	}
+
+	p {
+		margin: 0;
+	}
+}

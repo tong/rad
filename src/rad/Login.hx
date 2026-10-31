@@ -56,7 +56,7 @@ class Login extends LitElement {
 			jid: jid,
 			password: f.password,
 			room: room,
-			nick: (f.nick != "") ? f.nick : jid.substr(0, jid.indexOf("@")),
+			nick: (f.nick != "") ? f.nick : jid.substr(0, Std.int(Math.min(jid.indexOf("@"), 16))),
 			websocket: config.websocket ?? ((f.websocket ?? "") != "" ? f.websocket : 'wss://${jid.substr(jid.indexOf("@") + 1)}/xmpp-websocket')
 		};
 		Reflect.deleteField(f, "password");
@@ -69,7 +69,6 @@ class Login extends LitElement {
 
 	override function render()
 		return html(<form @submit=${submit}>
-			<h1>rad</h1>
 			${config.domain != null
 				? html(<label>user <input name="jid" placeholder=${'name @${config.domain}'} required autocomplete="username" .value=${value("jid")}></label>)
 				: html(<label>jid <input name="jid" type="email" placeholder="user@example.com" required autocomplete="username" .value=${value("jid")}></label>)}
@@ -77,9 +76,9 @@ class Login extends LitElement {
 			${config.room != null ? nothing : config.conference != null
 				? html(<label>room <input name="room" placeholder=${'name @${config.conference}'} required .value=${value("room")}></label>)
 				: html(<label>room <input name="room" type="email" placeholder="room@conference.example.com" required .value=${value("room")}></label>)}
-			<label>nick <input name="nick" placeholder="optional" .value=${value("nick")}></label>
+			<label>nick <input name="nick" placeholder="optional" maxlength="16" .value=${value("nick")}></label>
 			${config.websocket != null ? nothing : html(<label>websocket <input name="websocket" placeholder="wss://example.com/xmpp-websocket (optional)" .value=${value("websocket")}></label>)}
-			<button ?disabled=${busy}>${busy ? "connecting…" : "join"}</button>
+			<button data-icon="join" ?disabled=${busy}>${busy ? "connecting…" : "join"}</button>
 			${error != null ? html(<p class="error">${error}</p>) : nothing}
 		</form>);
 }

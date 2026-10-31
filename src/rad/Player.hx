@@ -1,5 +1,6 @@
 package rad;
 
+import js.Browser.document;
 import js.Browser.window;
 import lit.Directives.*;
 import lit.Lit.*;
@@ -8,6 +9,7 @@ import lit.LitElement;
 typedef Track = {
 	id:String,
 	url:String,
+	?title:String,
 	nick:String,
 
 	/** Length in seconds **/
@@ -48,6 +50,34 @@ class Player extends LitElement {
 	override function connectedCallback() {
 		super.connectedCallback();
 		timer = window.setInterval(tick, 1000);
+		final size:Dynamic = try haxe.Json.parse(window.localStorage.getItem("rad-size")) catch (_) null;
+		if (size != null)
+			for (name in Reflect.fields(size))
+				document.documentElement.style.setProperty(name, Reflect.field(size, name));
+	}
+
+	/**
+		Drag the border to resize the player: its width beside the chat, its height above it (mobile).
+		The size is set as `--player-width`/`--player-height` on the root element, used by the chat layout.
+	**/
+	function drag(e:js.html.PointerEvent) {
+		final handle:js.html.Element = cast e.currentTarget;
+		final vertical = handle.offsetWidth > handle.offsetHeight;
+		final name = vertical ? "--player-height" : "--player-width";
+		final rect = getBoundingClientRect();
+		final clamp = (v:Float, min:Float, max:Float) -> Math.round(Math.max(min, Math.min(v, max)));
+		e.preventDefault();
+		handle.setPointerCapture(e.pointerId);
+		handle.onpointermove = (e:js.html.PointerEvent) -> document.documentElement.style.setProperty(name,
+			vertical ? '${clamp(e.clientY - rect.top, 40, window.innerHeight - 200)}px' : '${clamp(e.clientX - rect.left, 160, window.innerWidth - 400)}px');
+		handle.onpointerup = _ -> {
+			handle.onpointermove = handle.onpointerup = null;
+			final size = {};
+			for (n in ["--player-width", "--player-height"])
+				if (document.documentElement.style.getPropertyValue(n) != "")
+					Reflect.setField(size, n, document.documentElement.style.getPropertyValue(n));
+			try window.localStorage.setItem("rad-size", haxe.Json.stringify(size)) catch (_) {}
+		}
 	}
 
 	override function disconnectedCallback() {
@@ -84,7 +114,7 @@ class Player extends LitElement {
 			media = null;
 			current = playing?.item;
 			if (playing != null)
-				media = Media.create(Media.parse(current.url), screen, (now - playing.start) / 1000);
+				media = Media.create(Media.parse(current.url), screen, () -> (Date.now().getTime() + offset - playing.start) / 1000);
 			requestUpdate();
 		} else if (media != null && ++ticks % 5 == 0) {
 			media.position().then(pos -> {
@@ -95,15 +125,23 @@ class Player extends LitElement {
 		}
 	}
 
+	static function icon(url:String)
+		return switch Media.parse(url) {
+			case YouTube(_) | Vimeo(_): "video";
+			case SoundCloud(_) | Mixcloud(_): "cloud";
+			case _: "music";
+		}
+
 	static function format(seconds:Float)
 		return '${Std.int(seconds / 60)}:${StringTools.lpad(Std.string(Std.int(seconds % 60)), "0", 2)}';
 
 	override function render()
 		return html(<div style="display:contents">
 			<div class="screen"></div>
+			<div class="split" @pointerdown=${drag}></div>
 			<ol>${map(schedule(items), s -> html(<li class=${classMap({current: s.item == current, played: s.end < Date.now().getTime() + offset})}>
-					<a href=${s.item.url} target="_blank">${s.item.url}</a>
-					<span class="muted">${format(s.item.duration)} · ${s.item.nick}</span>
+					<a href=${s.item.url} target="_blank" data-icon=${icon(s.item.url)}>${s.item.title ?? s.item.url}</a>
+					<span class="muted">${format(s.item.duration)} · <span class="nick" style="--hue:${Chat.hue(s.item.nick)}">${s.item.nick}</span> · ${DateTools.format(Date.fromTime(s.item.time - offset), "%Y-%m-%d %H:%M")}</span>
 				</li>))}</ol>
 		</div>);
 }
