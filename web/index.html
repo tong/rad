@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+    <title>rad</title>
+	
+    <meta name="description" content="This is RAD">
+	<meta name="application-name" content="rad">
+	<meta name="color-scheme" content="dark">
+	<meta name="theme-color" content="#0b0b0b">
+	<meta name="referrer" content="strict-origin-when-cross-origin">
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="rad">
+	<meta property="og:description" content="This is RAD">
+
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0b'/%3E%3Cpath d='M5 3l7 5-7 5z' fill='%235fd787'/%3E%3C/svg%3E">
+	<link rel="stylesheet" href="rad.css">
+	
+    <script type="module" src="bundle.js" async></script>
+</head>
+<body>
+	<!--
+		Configuration, all optional. A set value is used as is and its login field is hidden.
+		  domain      XMPP domain, users only enter their name
+		  websocket   WebSocket endpoint (default: wss://<domain>/xmpp-websocket)
+		  room        Room to join
+		  conference  MUC service, users only enter the room name
+		Example:
+		  <rad-app domain="example.com" websocket="wss://xmpp.example.com/xmpp-websocket" room="lobby@conference.example.com"></rad-app>
+	-->
+	<rad-app></rad-app>
+	<noscript>rad needs javascript</noscript>
+</body>
+</html>

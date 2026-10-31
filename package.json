@@ -1,0 +1,17 @@
+{
+  "name": "rad",
+  "private": true,
+  "scripts": {
+    "build": "haxe build.hxml && sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css && esbuild web/rad.js --bundle --format=esm --outfile=web/bundle.js",
+    "release": "haxe build.hxml && sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css --style=compressed && esbuild web/rad.js --minify --allow-overwrite --outfile=web/rad.js && esbuild web/rad.js --bundle --format=esm --minify --outfile=web/bundle.js",
+    "dev": "haxe build.hxml && (sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css --watch & esbuild web/rad.js --bundle --format=esm --outfile=web/bundle.js --watch=forever --servedir=web & watchexec -e hx,hxml -w src -w build.hxml haxe build.hxml)",
+    "start": "wtri --root web --threads 6",
+    "deploy": "npm run release && . ./.env && rsync -avz web/ \"${DEPLOY_TARGET:?set DEPLOY_TARGET in .env}\""
+  },
+  "devDependencies": {
+    "enron": "file:../lib/enron",
+    "esbuild": "^0.28.2",
+    "lit": "3.3.3",
+    "sass": "^1.107.1"
+  }
+}

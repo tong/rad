@@ -1,0 +1,6 @@
+-js web/rad.js
+-main rad.App
+-cp src
+-lib hxmpp
+-lib lit
+-dce full
