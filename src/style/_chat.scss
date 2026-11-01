@@ -104,6 +104,12 @@ rad-chat {
 			background: hsl(var(--hue) 22% 13%);
 			white-space: pre-wrap;
 			overflow-wrap: anywhere;
+
+			// Mentions the own nick
+			&.mention {
+				background: color-mix(in srgb, var(--accent) 22%, var(--bg));
+				box-shadow: inset 2px 0 var(--accent);
+			}
 		}
 
 		time {
@@ -146,6 +152,14 @@ rad-chat {
 		background: var(--panel);
 		li {
 			@include layout.no-text-overflow;
+		}
+
+		// Own user
+		.me {
+			font-weight: bold;
+			background: color-mix(in srgb, var(--accent) 12%, transparent);
+			margin: 0 -1rem;
+			padding: 0 1rem;
 		}
 	}
 

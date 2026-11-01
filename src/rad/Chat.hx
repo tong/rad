@@ -148,6 +148,20 @@ class Chat extends LitElement {
 		return html(<time title=${DateTools.format(date, "%Y-%m-%d %H:%M")}>${text}</time>);
 	}
 
+	/** Body contains `@` and the nick **/
+	public static function mentions(body:String, nick:String)
+		return new EReg('@${EReg.escape(nick)}(?![\\w-])', "i").match(body);
+
+	function mentionsMe(m:Message)
+		return muc != null && m.nick != muc.nick && mentions(m.body, muc.nick);
+
+	/** Nicks in alphabetical order, ignoring case **/
+	static function sorted(nicks:Array<String>) {
+		final a = nicks.copy();
+		a.sort((x, y) -> js.Syntax.code("{0}.localeCompare({1}, undefined, {sensitivity: 'base'})", x, y));
+		return a;
+	}
+
 	/** Stable color for a nick **/
 	public static function hue(nick:String) {
 		var h = 0;
@@ -174,10 +188,10 @@ class Chat extends LitElement {
 					? html(<div class="action" style="--hue:${hue(g[0].nick)}"><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}</span>${ago(g[0].time)}</div>)
 					: html(<div class=${g[0].nick == "*" ? "group notice" : "group"} style="--hue:${hue(g[0].nick)}">
 						<b class="nick">${g[0].nick}</b>
-						${map(g, m -> html(<p><span>${linkify(m.body)}</span>${ago(m.time)}</p>))}
+						${map(g, m -> html(<p class=${mentionsMe(m) ? "mention" : ""}><span>${linkify(m.body)}</span>${ago(m.time)}</p>))}
 					</div>))}
 			</div>
-			<ul class=${people ? "open" : ""}>${map(occupants, n -> html(<li class="nick" style="--hue:${hue(n)}">${n}</li>))}</ul>
+			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>
 			${people ? html(<div class="backdrop" @click=${() -> people = false}></div>) : nothing}
 			${settings && muc != null ? html(<rad-settings .muc=${muc} @close=${Settings.CLOSE.listen(() -> settings = false)}></rad-settings>) : nothing}
 			<form @submit=${submit}><textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>

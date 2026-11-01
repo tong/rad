@@ -2,6 +2,7 @@ package rad;
 
 import js.Browser.document;
 import js.Browser.window;
+import js.html.Notification;
 import js.html.WebSocket;
 import lit.Lit.*;
 import lit.LitElement;
@@ -87,6 +88,8 @@ class App extends LitElement {
 			} else if (muc != null && !offline)
 				check();
 		});
+		// Closing or reloading the tab: leave now, else the server keeps the hibernated session (stream management) in the room for minutes
+		window.addEventListener("pagehide", () -> if (muc != null) logout());
 	}
 
 	override function updated(changed:lit.PropertyValues)
@@ -96,6 +99,8 @@ class App extends LitElement {
 		busy = true;
 		error = null;
 		account = a;
+		if (Notification.permission == DEFAULT)
+			js.Syntax.code("Notification.requestPermission()"); // missing in the extern, for mentions, asked on the join click
 		final jid:Jid = a.jid;
 		stream = new Stream(jid.domain);
 		stream.framing = true;
@@ -183,6 +188,17 @@ class App extends LitElement {
 		});
 	}
 
+	/** System notification, throws where only service workers may notify (Android) **/
+	static function notify(nick:String, body:String)
+		if (Notification.permission == GRANTED)
+			try {
+				final n = new Notification(nick, {body: body, icon: "icons/icon-192.png"});
+				n.onclick = () -> {
+					window.focus();
+					n.close();
+				}
+			} catch (_) {}
+
 	function join(room:Jid, nick:String) {
 		occupants = [];
 		final muc = new Muc(stream, room.domain, room.node);
@@ -201,8 +217,12 @@ class App extends LitElement {
 			if (time != null && time.getTime() <= since)
 				return; // shown before the reconnect
 			seen = Math.max(seen, time?.getTime() ?? Date.now().getTime() + offset);
-			if (document.hidden && m.delay() == null && nick != muc.nick)
-				unread++;
+			if (m.delay() == null && nick != muc.nick) {
+				if (document.hidden)
+					unread++;
+				if (!document.hasFocus() && Chat.mentions(m.body, muc.nick))
+					notify(nick, m.body); // also when another window covers rad
+			}
 			messages = messages.concat([
 				{
 					nick: nick,

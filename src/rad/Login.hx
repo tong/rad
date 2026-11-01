@@ -47,6 +47,18 @@ class Login extends LitElement {
 	override function createRenderRoot()
 		return cast this;
 
+	final onHash:() -> Void = () -> requestUpdate(); // link pasted into an open rad tab, no reload
+
+	override function connectedCallback() {
+		super.connectedCallback();
+		window.addEventListener("hashchange", onHash);
+	}
+
+	override function disconnectedCallback() {
+		super.disconnectedCallback();
+		window.removeEventListener("hashchange", onHash);
+	}
+
 	function submit(e:Event) {
 		e.preventDefault();
 		final f:Dynamic = Object.fromEntries(new js.html.FormData(cast(e.target, FormElement)).entries());
@@ -64,8 +76,13 @@ class Login extends LitElement {
 		LOGIN.dispatch(this, a);
 	}
 
-	function value(key:String):String
+	/** Saved value, the room of a shared link (`#room@conference.example.com`) first **/
+	function value(key:String):String {
+		final hash = StringTools.urlDecode(window.location.hash.substr(1));
+		if (key == "room" && hash != "")
+			return hash;
 		return (saved != null) ? Reflect.field(saved, key) ?? "" : "";
+	}
 
 	override function render()
 		return html(<form @submit=${submit}>
