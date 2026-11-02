@@ -117,6 +117,37 @@ rad-chat {
 			}
 		}
 
+		// Message styling: the directives dimmed
+		.sd {
+			font-style: normal;
+			font-weight: normal;
+			color: var(--dim);
+		}
+
+		code,
+		pre {
+			font-family: ui-monospace, monospace;
+			font-size: .9em;
+			background: rgb(0 0 0 / .3);
+		}
+
+		code {
+			padding: 0 .2em;
+		}
+
+		pre {
+			margin: .2rem 0;
+			padding: .3rem .5rem;
+			white-space: pre-wrap;
+		}
+
+		blockquote {
+			margin: .2rem 0;
+			padding-left: .6rem;
+			border-left: 2px solid var(--line);
+			color: var(--dim);
+		}
+
 		time {
 			flex: none;
 			margin-left: auto;
@@ -136,6 +167,67 @@ rad-chat {
 			.nick {
 				font-size: 1em;
 			}
+		}
+
+		// Shown on hover, touch devices tap the message instead
+		.add {
+			flex: none;
+			align-self: center;
+			min-width: 0;
+			min-height: 0;
+			padding: 0;
+			color: var(--dim);
+			background: none;
+			opacity: 0;
+			&:hover:not(:disabled) {
+				background: none;
+				color: var(--accent);
+			}
+			&:focus-visible {
+				opacity: 1;
+			}
+			@media (pointer: coarse) {
+				display: none;
+			}
+		}
+
+		p:hover .add,
+		.action:hover .add {
+			opacity: 1;
+		}
+
+		.reactions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: .25rem;
+			margin-bottom: .2rem;
+
+			button {
+				padding: 0 .4rem;
+				font-size: .85em;
+				color: var(--fg, inherit);
+				background: var(--panel);
+				border: 1px solid var(--line);
+				&:hover:not(:disabled) {
+					background: var(--button);
+					color: inherit;
+				}
+			}
+
+			// Includes the own reaction: click removes it
+			.mine {
+				border-color: var(--accent);
+				background: color-mix(in srgb, var(--accent) 20%, var(--panel));
+			}
+
+			.pick {
+				border-style: dashed;
+			}
+		}
+
+		// Under an action line
+		> .reactions {
+			padding-left: calc(.6rem + 2px);
 		}
 
 		.notice {

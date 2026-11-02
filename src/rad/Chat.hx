@@ -10,8 +10,12 @@ import lit.LitElement;
 import lit.PropertyValues;
 import lit.Renderable;
 import rad.Player;
+import xmpp.MessageStyling;
 
 typedef Message = {
+	/** Id that reactions refer to, none for local notices **/
+	?id:String,
+
 	nick:String,
 	body:String,
 	time:Date,
@@ -24,6 +28,12 @@ typedef Message = {
 class Chat extends LitElement {
 	public static final SEND = new EventType<String>("send");
 	public static final LOGOUT = new EventType<Void>("logout");
+
+	/** Own reaction added or removed **/
+	public static final REACT = new EventType<{id:String, reaction:String}>("react");
+
+	/** Offered in the reaction picker **/
+	static final EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
 	/** Own typing started (`true`) or stopped, to send as chat state **/
 	public static final TYPING = new EventType<Bool>("typing");
@@ -43,6 +53,12 @@ class Chat extends LitElement {
 	@:property({attribute: false}) public var items:Array<rad.Player.Track> = [];
 	@:property({attribute: false}) public var offset = 0.0;
 	@:property({type: Boolean}) public var offline = false;
+
+	/** Reactions by message id, then nick **/
+	@:property({attribute: false}) public var reactions = new Map<String, Map<String, Array<String>>>();
+
+	/** Message id of the open reaction picker **/
+	@:state var picking:Null<String>;
 
 	/** Nicks of the others typing **/
 	@:property({attribute: false}) public var typing:Array<String> = [];
@@ -129,6 +145,43 @@ class Chat extends LitElement {
 		if (v != composing && (shareTyping || !v))
 			TYPING.dispatch(this, composing = v);
 
+	function react(id:String, reaction:String) {
+		picking = null;
+		REACT.dispatch(this, {id: id, reaction: reaction});
+	}
+
+	function pick(id:String)
+		picking = (picking == id) ? null : id;
+
+	/** Touch devices, no hover for the react button: tapping a message opens the picker **/
+	function tap(e:js.html.MouseEvent, m:Message)
+		if (m.id != null && js.Browser.window.matchMedia("(pointer: coarse)").matches && (cast e.target : js.html.Element).closest("a, button") == null)
+			pick(m.id);
+
+	function reactButton(m:Message)
+		return (m.id == null) ? nothing : html(<button class="add" data-icon="react" title="react" aria-label="react" @click=${() -> pick(m.id)}></button>);
+
+	/** Reactions to a message with their counts, and the picker **/
+	function reactionBar(m:Message):Renderable {
+		if (m.id == null)
+			return nothing;
+		final counts:Array<{reaction:String, nicks:Array<String>}> = [];
+		for (nick => list in reactions[m.id] ?? new Map())
+			for (r in list) {
+				final c = Lambda.find(counts, c -> c.reaction == r);
+				if (c != null)
+					c.nicks.push(nick);
+				else
+					counts.push({reaction: r, nicks: [nick]});
+			}
+		if (counts.length == 0 && picking != m.id)
+			return nothing;
+		return html(<div class="reactions">
+			${map(counts, c -> html(<button class=${c.nicks.contains(muc?.nick) ? "mine" : ""} title=${c.nicks.join(", ")} @click=${() -> react(m.id, c.reaction)}>${c.reaction} ${c.nicks.length}</button>))}
+			${picking == m.id ? map(EMOJIS.filter(e -> !Lambda.exists(counts, c -> c.reaction == e)), e -> html(<button class="pick" @click=${() -> react(m.id, e)}>${e}</button>)) : nothing}
+		</div>);
+	}
+
 	/** E.g. `tong is typing…` **/
 	static function typingText(nicks:Array<String>)
 		return switch nicks.length {
@@ -187,6 +240,41 @@ class Chat extends LitElement {
 		return parts;
 	}
 
+	/** Body with styling (XEP-0393) and links, the directives shown dimmed **/
+	static function styled(body:String):Array<Renderable>
+		return blocks(MessageStyling.parse(body));
+
+	static function blocks(blocks:Array<StyledBlock>):Array<Renderable> {
+		final out:Array<Renderable> = [];
+		var line = false; // the previous block is a line, a line break is needed
+		for (b in blocks) {
+			switch b {
+				case Line(s):
+					if (line)
+						out.push("\n");
+					out.push(spans(s));
+				case Pre(t):
+					out.push(html(<pre>${t}</pre>));
+				case Quote(b):
+					out.push(html(<blockquote>${Chat.blocks(b)}</blockquote>));
+			}
+			line = b.match(Line(_));
+		}
+		return out;
+	}
+
+	static function spans(spans:Array<StyledSpan>):Array<Renderable>
+		return [
+			for (s in spans)
+				switch s {
+					case Plain(t): linkify(t);
+					case Strong(s): html(<strong><i class="sd">*</i>${Chat.spans(s)}<i class="sd">*</i></strong>);
+					case Emphasis(s): html(<em><i class="sd">_</i>${Chat.spans(s)}<i class="sd">_</i></em>);
+					case Strike(s): html(<s><i class="sd">~</i>${Chat.spans(s)}<i class="sd">~</i></s>);
+					case Code(t): html(<code><i class="sd">`</i>${t}<i class="sd">`</i></code>);
+				}
+		];
+
 	/** Age of a message, e.g. `6m`, the date on hover **/
 	static function ago(date:Date) {
 		final s = (Date.now().getTime() - date.getTime()) / 1000;
@@ -231,10 +319,10 @@ class Chat extends LitElement {
 			<rad-player .items=${items} .offset=${offset}></rad-player>
 			<div class="log">
 				${map(groups(messages), g -> g[0].action
-					? html(<div class="action" style="--hue:${hue(g[0].nick)}"><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}</span>${ago(g[0].time)}</div>)
+					? ([html(<div class="action" style="--hue:${hue(g[0].nick)}" @click=${e -> tap(e, g[0])}><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}</span>${reactButton(g[0])}${ago(g[0].time)}</div>), reactionBar(g[0])] : Renderable)
 					: html(<div class=${g[0].nick == "*" ? "group notice" : "group"} style="--hue:${hue(g[0].nick)}">
 						<b class="nick">${g[0].nick}</b>
-						${map(g, m -> html(<p class=${mentionsMe(m) ? "mention" : ""}><span>${linkify(m.body)}</span>${ago(m.time)}</p>))}
+						${map(g, m -> ([html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
 					</div>))}
 			</div>
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>

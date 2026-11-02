@@ -12,6 +12,8 @@ import rad.Player;
 import rad.Player.Track;
 import xmpp.ChatState;
 import xmpp.Jid;
+import xmpp.MessageReactions;
+import xmpp.StanzaId;
 import xmpp.EntityTime;
 import xmpp.Muc;
 import xmpp.Presence;
@@ -45,6 +47,9 @@ class App extends LitElement {
 	@:state var occupants:Array<String> = [];
 	@:state var items:Array<Track> = [];
 	@:state var offset = 0.0;
+
+	/** Reactions (XEP-0444) by message id, then nick **/
+	@:state var reactions = new Map<String, Map<String, Array<String>>>();
 
 	/** Nicks of the others typing (XEP-0085) **/
 	@:state var typing:Array<String> = [];
@@ -213,17 +218,23 @@ class App extends LitElement {
 	function join(room:Jid, nick:String) {
 		occupants = [];
 		typing = [];
+		reactions = new Map();
 		final muc = new Muc(stream, room.domain, room.node);
 		stream.onPresence = muc.handlePresence;
 		stream.onMessage = m -> {
-			// Chat states come without a body, Muc passes on messages with a body only
+			// Reactions and chat states come without a body, Muc passes on messages with a body only
 			final nick = Jid.parseResource(m.from);
-			if (muc.isFromRoom(m.from) && m.type == groupchat && m.delay() == null && nick != null && nick != muc.nick) {
-				final state = ChatState.getChatState(m);
-				if (state == composing)
-					setTyping(nick, true);
-				else if (state != null || m.body != null)
-					setTyping(nick, false);
+			if (muc.isFromRoom(m.from) && m.type == groupchat && nick != null) {
+				final r = MessageReactions.getReactions(m);
+				if (r != null)
+					setReactions(r.id, nick, r.reactions); // also the own, reflected by the room
+				if (m.delay() == null && nick != muc.nick) {
+					final state = ChatState.getChatState(m);
+					if (state == composing)
+						setTyping(nick, true);
+					else if (state != null || m.body != null)
+						setTyping(nick, false);
+				}
 			}
 			muc.handleMessage(m);
 		}
@@ -250,6 +261,7 @@ class App extends LitElement {
 			}
 			messages = messages.concat([
 				{
+					id: StanzaId.getStanzaId(m, '${muc.room}@${muc.host}') ?? m.id, // what reactions refer to
 					nick: nick,
 					body: m.body,
 					action: Lambda.exists(m.properties, e -> e.is(XMLNS_MEDIA)),
@@ -366,6 +378,27 @@ class App extends LitElement {
 			typing = on ? typing.concat([nick]) : typing.filter(n -> n != nick);
 	}
 
+	/** Replaces the reactions of `nick` to message `id` **/
+	function setReactions(id:String, nick:String, list:Array<String>) {
+		final next = reactions.copy();
+		final byNick = next[id]?.copy() ?? new Map();
+		if (list.length > 0)
+			byNick[nick] = list;
+		else
+			byNick.remove(nick);
+		next[id] = byNick;
+		reactions = next;
+	}
+
+	/** Adds or removes an own reaction **/
+	function react(r:{id:String, reaction:String}) {
+		if (offline)
+			return notice("Not connected, reconnecting…");
+		final own = reactions[r.id]?.get(muc.nick) ?? [];
+		final list = own.contains(r.reaction) ? own.filter(e -> e != r.reaction) : own.concat([r.reaction]);
+		muc.stream.send(MessageReactions.react(new xmpp.Message('${muc.room}@${muc.host}', null, null, groupchat), r.id, list));
+	}
+
 	/** Sends the own typing state **/
 	function sendTyping(on:Bool)
 		if (muc != null && !offline)
@@ -378,6 +411,7 @@ class App extends LitElement {
 		if (offline)
 			return notice("Not connected, reconnecting…");
 		final m = new xmpp.Message('${muc.room}@${muc.host}', body, null, groupchat);
+		m.id = xmpp.Stream.makeRandomId(); // for reactions, when the room adds no stanza-id
 		if (elements != null)
 			m.properties = m.properties.concat(elements);
 		if (Chat.shareTyping)
@@ -438,6 +472,6 @@ class App extends LitElement {
 		return if (muc == null)
 			html(<rad-login ?busy=${busy} .error=${error} .config=${{domain: domain, websocket: websocket, room: room, conference: conference}} @login=${Login.LOGIN.listen(login)}></rad-login>);
 		else
-			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc} .typing=${typing}
-				@send=${Chat.SEND.listen(send)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)}></rad-chat>);
+			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc} .typing=${typing} .reactions=${reactions}
+				@send=${Chat.SEND.listen(send)} @react=${Chat.REACT.listen(react)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)}></rad-chat>);
 }
