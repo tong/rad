@@ -144,9 +144,12 @@ class Player extends LitElement {
 
 	static function icon(url:String)
 		return switch Media.parse(url) {
-			case YouTube(_) | Vimeo(_): "video";
-			case SoundCloud(_) | Mixcloud(_): "cloud";
-			case _: "music";
+			case YouTube(_): "youtube";
+			case Vimeo(_): "vimeo";
+			case SoundCloud(_): "soundcloud";
+			case Mixcloud(_): "cloud";
+			case File(url): Media.isAudio(url) ? "music" : "video";
+			case null: "music";
 		}
 
 	static function format(seconds:Float)

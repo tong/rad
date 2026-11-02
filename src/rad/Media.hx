@@ -36,6 +36,10 @@ abstract class Media {
 		}
 	}
 
+	/** The media file at `url` is audio, played with a visualizer **/
+	public static function isAudio(url:String):Bool
+		return ~/\.(mp3|ogg|oga|opus|wav|flac|m4a|aac)$/i.match(new js.html.URL(url, document.baseURI).pathname);
+
 	/**
 		Embeds a player for `source` into `parent`.
 		Once loaded it plays from the position returned by `start`, which is asked only then, as loading takes a while.
@@ -153,7 +157,7 @@ class FileMedia extends Media {
 	var fail:Dynamic->Void = _ -> {};
 
 	public function new(parent:Element, url:String, ?start:() -> Float) {
-		final audio = ~/\.(mp3|ogg|oga|opus|wav|flac|m4a|aac)$/i.match(new js.html.URL(url, document.baseURI).pathname);
+		final audio = Media.isAudio(url);
 		video = audio ? document.createAudioElement() : document.createVideoElement();
 		video.controls = false; // playback follows the room
 		video.preload = "metadata";
