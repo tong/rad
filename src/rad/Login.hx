@@ -90,10 +90,10 @@ class Login extends LitElement {
 				? html(<label>user <input name="jid" placeholder=${'name @${config.domain}'} required autocomplete="username" .value=${value("jid")}></label>)
 				: html(<label>jid <input name="jid" type="email" placeholder="user@example.com" required autocomplete="username" .value=${value("jid")}></label>)}
 			<label>password <input name="password" type="password" required autocomplete="current-password"></label>
+			<label>nick <input name="nick" placeholder="optional" maxlength="16" .value=${value("nick")}></label>
 			${config.room != null ? nothing : config.conference != null
 				? html(<label>room <input name="room" placeholder=${'name @${config.conference}'} required .value=${value("room")}></label>)
 				: html(<label>room <input name="room" type="email" placeholder="room@conference.example.com" required .value=${value("room")}></label>)}
-			<label>nick <input name="nick" placeholder="optional" maxlength="16" .value=${value("nick")}></label>
 			${config.websocket != null ? nothing : html(<label>websocket <input name="websocket" placeholder="wss://example.com/xmpp-websocket (optional)" .value=${value("websocket")}></label>)}
 			<button data-icon="join" ?disabled=${busy}>${busy ? "connecting…" : "join"}</button>
 			${error != null ? html(<p class="error">${error}</p>) : nothing}

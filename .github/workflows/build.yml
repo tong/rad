@@ -1,0 +1,31 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: krdlab/setup-haxe@v2
+        with:
+          haxe-version: 5.0.0-preview.1
+
+      - name: Haxe libraries
+        run: |
+          haxelib git sasl https://github.com/tong/hxsasl
+          haxelib git hxmpp https://github.com/tong/hxmpp
+          haxelib git lit https://github.com/tong/hxlit
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run release
