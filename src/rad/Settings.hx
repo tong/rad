@@ -109,6 +109,7 @@ class Settings extends LitElement {
 				<button data-icon="close" title="close" aria-label="close" @click=${() -> CLOSE.dispatch(this)}></button>
 			</header>
 			${status != null ? html(<p class="status">${status}</p>) : nothing}
+			<label class="check"><input type="checkbox" .checked=${Chat.shareTyping} @change=${(e:Event) -> Chat.shareTyping = (cast e.target : js.html.InputElement).checked}> show others when I'm typing</label>
 			<form @submit=${changeNick}>
 				<label>nick <input name="nick" maxlength="16" required .value=${muc.nick}></label>
 				<button>save</button>

@@ -38,11 +38,15 @@ class Player extends LitElement {
 	@:property({type: Number}) public var offset = 0.0;
 
 	@:query(".screen") var screen:js.html.Element;
+	@:query("ol") var list:js.html.Element;
 
 	var current:Null<Track>;
 	var media:Null<Media>;
 	var timer = 0;
 	var ticks = 0;
+
+	/** Items when last rendered, the list scrolls to a new one **/
+	var count = 0;
 
 	override function createRenderRoot()
 		return cast this;
@@ -78,6 +82,12 @@ class Player extends LitElement {
 					Reflect.setField(size, n, document.documentElement.style.getPropertyValue(n));
 			try window.localStorage.setItem("rad-size", haxe.Json.stringify(size)) catch (_) {}
 		}
+	}
+
+	override function updated(changed:lit.PropertyValues) {
+		if (items.length > count)
+			list.scrollTop = list.scrollHeight;
+		count = items.length;
 	}
 
 	override function disconnectedCallback() {
@@ -125,6 +135,13 @@ class Player extends LitElement {
 		}
 	}
 
+	/** Toggles fullscreen of the screen, the players have no controls for it **/
+	function fullscreen()
+		if (document.fullscreenElement != null)
+			document.exitFullscreen();
+		else if (screen.requestFullscreen != null) // not on iPhone
+			screen.requestFullscreen();
+
 	static function icon(url:String)
 		return switch Media.parse(url) {
 			case YouTube(_) | Vimeo(_): "video";
@@ -137,7 +154,10 @@ class Player extends LitElement {
 
 	override function render()
 		return html(<div style="display:contents">
-			<div class="screen"></div>
+			<div class="screen" @click=${() -> media?.click()} @dblclick=${fullscreen}></div>
+			${current != null && Media.adjustable ? html(<label class="volume" data-icon="volume" title="volume">
+				<input type="range" min="0" max="1" step="0.01" aria-label="volume" .value=${Std.string(Media.level)} @input=${(e:js.html.Event) -> media?.volume(Media.level = Std.parseFloat((cast e.target : js.html.InputElement).value))}>
+			</label>) : nothing}
 			<div class="split" @pointerdown=${drag}></div>
 			<ol>${map(schedule(items), s -> html(<li class=${classMap({current: s.item == current, played: s.end < Date.now().getTime() + offset})}>
 					<a href=${s.item.url} target="_blank" data-icon=${icon(s.item.url)}>${s.item.title ?? s.item.url}</a>

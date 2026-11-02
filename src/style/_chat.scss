@@ -1,3 +1,4 @@
+@use 'pkg:enron/enron/a11y';
 @use 'pkg:enron/enron/break';
 @use 'pkg:enron/enron/layout';
 
@@ -26,6 +27,10 @@ rad-chat {
 		padding-top: max(.4rem, env(safe-area-inset-top));
 		border-bottom: 1px solid var(--line);
 		background: var(--panel);
+		// Over the player and the log
+		position: relative;
+		z-index: 2;
+		box-shadow: 0 4px 8px -4px rgb(0 0 0 / .6);
 
 		// Subject, then the room address if it fits on the line: else it wraps to the clipped second line
 		.title {
@@ -176,6 +181,22 @@ rad-chat {
 		padding: .4rem 1rem;
 		padding-bottom: max(.4rem, env(safe-area-inset-bottom));
 		border-top: 1px solid var(--line);
+		position: relative; // over the log, for the shadow and the typing line
+		box-shadow: 0 -4px 8px -4px rgb(0 0 0 / .6);
+
+		// Over the bottom of the log, no layout shift
+		.typing {
+			position: absolute;
+			bottom: 100%;
+			left: 0;
+			right: 0;
+			padding: .5rem 1rem .1rem;
+			font-size: .8em;
+			color: var(--dim);
+			background: linear-gradient(transparent, var(--bg) 40%);
+			pointer-events: none;
+			@include layout.no-text-overflow;
+		}
 
 		// One line, grows with its content where field-sizing is supported
 		textarea {
@@ -188,6 +209,12 @@ rad-chat {
 			line-height: inherit;
 			&:focus-visible {
 				outline: none;
+			}
+			// "loading media…" while a command runs
+			&:disabled {
+				@include a11y.motion {
+					animation: pulse 1.6s ease-in-out infinite;
+				}
 			}
 		}
 	}
@@ -202,7 +229,8 @@ rad-chat {
 			top: 0;
 			right: 0;
 			bottom: 0;
-			width: min(16rem, 80vw);
+			width: max-content; // the longest nick
+			max-width: 80vw;
 			padding: max(.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) 1rem;
 			transform: translateX(100%);
 			visibility: hidden;
@@ -230,6 +258,9 @@ rad-chat {
 
 		.log {
 			grid-area: 3 / 1;
+			padding-inline: .5rem;
+			// Sunk between the player and the input
+			box-shadow: inset 0 6px 6px -6px rgb(0 0 0 / .7), inset 0 -6px 6px -6px rgb(0 0 0 / .7);
 		}
 
 		> div > form {
@@ -239,4 +270,8 @@ rad-chat {
 			}
 		}
 	}
+}
+
+@keyframes pulse {
+	50% { opacity: .3; }
 }

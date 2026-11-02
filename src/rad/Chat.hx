@@ -25,6 +25,17 @@ class Chat extends LitElement {
 	public static final SEND = new EventType<String>("send");
 	public static final LOGOUT = new EventType<Void>("logout");
 
+	/** Own typing started (`true`) or stopped, to send as chat state **/
+	public static final TYPING = new EventType<Bool>("typing");
+
+	/** Send the own typing state, a setting **/
+	public static var shareTyping(default, set):Bool = try js.Browser.window.localStorage.getItem("rad-typing") != "off" catch (_) true;
+
+	static function set_shareTyping(v:Bool) {
+		try js.Browser.window.localStorage.setItem("rad-typing", v ? "on" : "off") catch (_) {}
+		return shareTyping = v;
+	}
+
 	@:property public var room = "";
 	@:property public var subject = "";
 	@:property({attribute: false}) public var messages:Array<Message> = [];
@@ -32,6 +43,9 @@ class Chat extends LitElement {
 	@:property({attribute: false}) public var items:Array<rad.Player.Track> = [];
 	@:property({attribute: false}) public var offset = 0.0;
 	@:property({type: Boolean}) public var offline = false;
+
+	/** Nicks of the others typing **/
+	@:property({attribute: false}) public var typing:Array<String> = [];
 
 	/** A command is in progress, input is blocked **/
 	@:property({type: Boolean}) public var busy = false;
@@ -55,6 +69,11 @@ class Chat extends LitElement {
 	/** Input before browsing started **/
 	var draft = "";
 
+	/** Own typing state sent, and the timer to stop it after a pause **/
+	var composing = false;
+
+	var pause:Null<Int>;
+
 	@:query(".log") var log:js.html.Element;
 	@:query("form textarea") var input:TextAreaElement;
 
@@ -69,6 +88,7 @@ class Chat extends LitElement {
 	override function disconnectedCallback() {
 		super.disconnectedCallback();
 		js.Browser.window.clearInterval(timer);
+		js.Browser.window.clearTimeout(pause);
 	}
 
 	/** Focuses the input on desktop only, on touch devices the keyboard would cover the chat **/
@@ -92,13 +112,39 @@ class Chat extends LitElement {
 		}
 		browse = sent.length;
 		setInput("");
+		js.Browser.window.clearTimeout(pause);
+		composing = false; // the message says it
 	}
 
-	/** Enter sends, shift+enter breaks the line, arrow up/down on the first/last line browse the sent messages **/
+	/** Typing, stops after 5 seconds without input or when the input is cleared **/
+	function onInput() {
+		js.Browser.window.clearTimeout(pause);
+		if (input.value == "")
+			return setComposing(false);
+		setComposing(true);
+		pause = js.Browser.window.setTimeout(() -> setComposing(false), 5000);
+	}
+
+	function setComposing(v:Bool)
+		if (v != composing && (shareTyping || !v))
+			TYPING.dispatch(this, composing = v);
+
+	/** E.g. `tong is typing…` **/
+	static function typingText(nicks:Array<String>)
+		return switch nicks.length {
+			case 1: '${nicks[0]} is typing…';
+			case 2: '${nicks[0]} and ${nicks[1]} are typing…';
+			case n: '$n people are typing…';
+		}
+
+	/**
+		Enter sends, shift+enter breaks the line, arrow up/down on the first/last line browse the sent messages.
+		Touch devices: enter breaks the line, the send button sends.
+	**/
 	function onKey(e:KeyboardEvent) {
 		final value = input.value;
 		switch e.key {
-			case "Enter" if (!e.shiftKey):
+			case "Enter" if (!e.shiftKey && !js.Browser.window.matchMedia("(pointer: coarse)").matches):
 				submit(e);
 			case "ArrowUp" if (browse > 0 && value.lastIndexOf("\n", input.selectionStart - 1) == -1):
 				if (browse == sent.length)
@@ -194,6 +240,6 @@ class Chat extends LitElement {
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>
 			${people ? html(<div class="backdrop" @click=${() -> people = false}></div>) : nothing}
 			${settings && muc != null ? html(<rad-settings .muc=${muc} @close=${Settings.CLOSE.listen(() -> settings = false)}></rad-settings>) : nothing}
-			<form @submit=${submit}><textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
+			<form @submit=${submit}>${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
 		</div>);
 }

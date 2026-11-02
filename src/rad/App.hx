@@ -10,6 +10,7 @@ import rad.Chat;
 import rad.Login;
 import rad.Player;
 import rad.Player.Track;
+import xmpp.ChatState;
 import xmpp.Jid;
 import xmpp.EntityTime;
 import xmpp.Muc;
@@ -44,6 +45,12 @@ class App extends LitElement {
 	@:state var occupants:Array<String> = [];
 	@:state var items:Array<Track> = [];
 	@:state var offset = 0.0;
+
+	/** Nicks of the others typing (XEP-0085) **/
+	@:state var typing:Array<String> = [];
+
+	/** Clears a typing nick when its `paused` got lost **/
+	final typingTimers = new Map<String, Int>();
 
 	/** Messages received while the page was hidden **/
 	@:state var unread = 0;
@@ -104,7 +111,10 @@ class App extends LitElement {
 		final jid:Jid = a.jid;
 		stream = new Stream(jid.domain);
 		stream.framing = true;
-		stream.output = str -> ws.send(str);
+		stream.output = str -> {
+			js.Browser.console.debug("%c→ " + str, "color:#e8a");
+			ws.send(str);
+		}
 		stream.onEnd = () -> drop("Stream closed");
 		sm = new StreamManagement(stream);
 		resource = 'rad-' + StringTools.hex(Std.random(0xffffff));
@@ -121,6 +131,7 @@ class App extends LitElement {
 		ws = new WebSocket(a.websocket, xmpp.net.WebSocket.PROTOCOL);
 		ws.onmessage = e -> {
 			received = Date.now().getTime();
+			js.Browser.console.debug("%c← " + e.data, "color:#8ae");
 			stream.recv(e.data);
 		}
 		ws.onclose = () -> drop('Connection to ${a.websocket} closed');
@@ -201,15 +212,29 @@ class App extends LitElement {
 
 	function join(room:Jid, nick:String) {
 		occupants = [];
+		typing = [];
 		final muc = new Muc(stream, room.domain, room.node);
 		stream.onPresence = muc.handlePresence;
-		stream.onMessage = muc.handleMessage;
+		stream.onMessage = m -> {
+			// Chat states come without a body, Muc passes on messages with a body only
+			final nick = Jid.parseResource(m.from);
+			if (muc.isFromRoom(m.from) && m.type == groupchat && m.delay() == null && nick != null && nick != muc.nick) {
+				final state = ChatState.getChatState(m);
+				if (state == composing)
+					setTyping(nick, true);
+				else if (state != null || m.body != null)
+					setTyping(nick, false);
+			}
+			muc.handleMessage(m);
+		}
 		muc.onPresence = p -> {
 			final n = Jid.parseResource(p.from);
 			final gone = p.type == unavailable;
 			if (this.muc == muc && n != muc.nick && occupants.contains(n) == gone) // not while joining
 				messages = messages.concat([{nick: n, body: gone ? "left" : "joined", time: Date.now(), action: true}]);
 			occupants = occupants.filter(o -> o != n).concat(gone ? [] : [n]);
+			if (gone)
+				setTyping(n, false);
 		}
 		muc.onMessage = m -> {
 			final nick = Jid.parseResource(m.from) ?? "";
@@ -331,6 +356,21 @@ class App extends LitElement {
 		}
 	}
 
+	/** Shows or hides a typing nick, hidden after 30 seconds without news **/
+	function setTyping(nick:String, on:Bool) {
+		window.clearTimeout(typingTimers[nick]);
+		typingTimers.remove(nick);
+		if (on)
+			typingTimers[nick] = window.setTimeout(() -> setTyping(nick, false), 30000);
+		if (typing.contains(nick) != on)
+			typing = on ? typing.concat([nick]) : typing.filter(n -> n != nick);
+	}
+
+	/** Sends the own typing state **/
+	function sendTyping(on:Bool)
+		if (muc != null && !offline)
+			muc.stream.send(ChatState.setChatState(new xmpp.Message('${muc.room}@${muc.host}', null, null, groupchat), on ? composing : paused));
+
 	function removal(item:Track, time:Float)
 		return XML.create("remove").set("xmlns", XMLNS_MEDIA).set("id", item.id).set("time", Std.string(time));
 
@@ -340,6 +380,8 @@ class App extends LitElement {
 		final m = new xmpp.Message('${muc.room}@${muc.host}', body, null, groupchat);
 		if (elements != null)
 			m.properties = m.properties.concat(elements);
+		if (Chat.shareTyping)
+			ChatState.setChatState(m, active);
 		muc.stream.send(m);
 	}
 
@@ -396,6 +438,6 @@ class App extends LitElement {
 		return if (muc == null)
 			html(<rad-login ?busy=${busy} .error=${error} .config=${{domain: domain, websocket: websocket, room: room, conference: conference}} @login=${Login.LOGIN.listen(login)}></rad-login>);
 		else
-			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc}
-				@send=${Chat.SEND.listen(send)} @logout=${Chat.LOGOUT.listen(logout)}></rad-chat>);
+			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc} .typing=${typing}
+				@send=${Chat.SEND.listen(send)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)}></rad-chat>);
 }

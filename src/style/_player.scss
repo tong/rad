@@ -1,7 +1,5 @@
-@use 'pkg:enron/enron/a11y';
 @use 'pkg:enron/enron/break';
 @use 'pkg:enron/enron/glyph';
-@use 'icons';
 
 rad-player {
 	grid-area: 2 / 1 / 4;
@@ -10,6 +8,21 @@ rad-player {
 	position: relative;
 	min-height: 0;
 	border-right: 1px solid var(--line);
+
+	// Volume of the playing item, below the screen
+	.volume {
+		display: flex;
+		align-items: center;
+		gap: .6rem;
+		padding: .3rem 1rem;
+		color: var(--dim);
+		border-bottom: 1px solid var(--line);
+		input {
+			flex: 1;
+			min-width: 0;
+			margin: 0;
+		}
+	}
 
 	// Drag handle on the border to the chat
 	.split {
@@ -30,6 +43,7 @@ rad-player {
 
 	.screen {
 		aspect-ratio: 16 / 9;
+		user-select: none; // double-click is fullscreen, not a selection
 		background: #000;
 		border-bottom: 1px solid var(--line);
 
@@ -41,24 +55,26 @@ rad-player {
 			border: 0;
 		}
 
-		&:empty {
+		// Embedded players: no hover overlays, no pausing or seeking, a click on the screen starts a blocked autoplay
+		iframe {
+			pointer-events: none;
+		}
+
+		// Audio file: frequency bars, no controls
+		.audio {
 			display: flex;
-			gap: .5em;
-			align-items: center;
-			justify-content: center;
-			aspect-ratio: auto;
-			height: 2.5rem;
-			color: var(--dim);
-			&::before {
-				@include icons.icon(off);
+			flex-direction: column;
+			justify-content: flex-end;
+			canvas {
+				flex: 1;
+				min-height: 0;
+				width: 100%;
 			}
-			&::after {
-				content: 'no signal';
-				color: var(--dim);
-			}
-			@include a11y.motion {
-				&::after { animation: blink 1.2s steps(2) infinite; }
-			}
+		}
+
+		// Nothing playing
+		&:empty {
+			display: none;
 		}
 	}
 
@@ -117,6 +133,10 @@ rad-player {
 		overflow: hidden;
 		border-right: 0;
 		border-bottom: 1px solid var(--line);
+		// Stands apart from the chat below: lighter, casting a shadow on it
+		z-index: 1;
+		background: var(--panel);
+		box-shadow: 0 4px 8px -4px rgb(0 0 0 / .6);
 
 		.screen {
 			flex: none;
@@ -125,20 +145,41 @@ rad-player {
 		ol {
 			min-height: 0;
 			max-height: var(--player-height, 25dvh);
+			padding-right: .5rem;
+			padding-left: 2.5rem; // room for the numbers
+			&:empty::before {
+				margin-left: -2rem;
+			}
 		}
 
 		.split {
 			top: auto;
 			right: 0;
-			bottom: -4px;
+			bottom: 0; // inside, the player clips its overflow
 			left: 0;
 			width: auto;
-			height: 7px;
+			height: 24px; // big enough to touch
 			cursor: row-resize;
+			// Grip above the border, the only visible part
+			&::after {
+				content: '';
+				position: absolute;
+				bottom: 4px;
+				left: 50%;
+				width: 2.5rem;
+				height: 4px;
+				border-radius: 2px;
+				background: var(--line);
+				transform: translateX(-50%);
+			}
+			&:hover,
+			&:active {
+				background: none;
+				opacity: 1;
+				&::after {
+					background: var(--accent);
+				}
+			}
 		}
 	}
-}
-
-@keyframes blink {
-	50% { opacity: 0; }
 }
