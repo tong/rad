@@ -22,6 +22,18 @@ class Settings extends LitElement {
 	/** [XEP-0045: Owner Use Cases](https://xmpp.org/extensions/xep-0045.html#owner) **/
 	static inline var XMLNS_OWNER = "http://jabber.org/protocol/muc#owner";
 
+	/**
+		Color scheme: `light`, `dark` or empty for the system preference.
+		On the root element as `data-theme`, set by `index.html` too before the page shows.
+	**/
+	public static var theme(default, set):String = try js.Browser.window.localStorage.getItem("rad-theme") ?? "" catch (_) "";
+
+	static function set_theme(v:String) {
+		try js.Browser.window.localStorage.setItem("rad-theme", v) catch (_) {}
+		js.Browser.document.documentElement.dataset.theme = v;
+		return theme = v;
+	}
+
 	@:property({attribute: false}) public var muc:Muc;
 
 	/** Room configuration form, owners only **/
@@ -109,6 +121,9 @@ class Settings extends LitElement {
 				<button data-icon="close" title="close" aria-label="close" @click=${() -> CLOSE.dispatch(this)}></button>
 			</header>
 			${status != null ? html(<p class="status">${status}</p>) : nothing}
+			<label>theme <select @change=${(e:Event) -> theme = (cast e.target : js.html.SelectElement).value}>
+				${map([["", "system"], ["light", "light"], ["dark", "dark"]], o -> html(<option value=${o[0]} ?selected=${theme == o[0]}>${o[1]}</option>))}
+			</select></label>
 			<label class="check"><input type="checkbox" .checked=${Chat.shareTyping} @change=${(e:Event) -> Chat.shareTyping = (cast e.target : js.html.InputElement).checked}> show others when I'm typing</label>
 			<form @submit=${changeNick}>
 				<label>nick <input name="nick" maxlength="16" required .value=${muc.nick}></label>

@@ -8,8 +8,9 @@
 	
     <meta name="description" content="This is RAD">
 	<meta name="application-name" content="rad">
-	<meta name="color-scheme" content="dark">
-	<meta name="theme-color" content="#0b0b0b">
+	<meta name="color-scheme" content="dark light">
+	<meta name="theme-color" content="#0b0b0b" media="(prefers-color-scheme: dark)">
+	<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
 	<meta name="referrer" content="strict-origin-when-cross-origin">
 	<meta property="og:type" content="website">
 	<meta property="og:title" content="rad">
@@ -22,6 +23,7 @@
 	<meta name="apple-mobile-web-app-title" content="rad">
 	<link rel="stylesheet" href="rad.css">
 	
+	<script>try { document.documentElement.dataset.theme = localStorage.getItem("rad-theme") || "" } catch (e) {} // before the first paint, see Settings.theme</script>
     <script type="module" src="rad.js" async></script>
 </head>
 <body>

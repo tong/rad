@@ -88,5 +88,5 @@ button {
 }
 
 .nick {
-	color: hsl(var(--hue, 0) 60% 65%);
+	color: hsl(var(--hue, 0) var(--nick-sl));
 }

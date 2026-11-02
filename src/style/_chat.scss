@@ -30,7 +30,7 @@ rad-chat {
 		// Over the player and the log
 		position: relative;
 		z-index: 2;
-		box-shadow: 0 4px 8px -4px rgb(0 0 0 / .6);
+		box-shadow: 0 4px 8px -4px var(--shadow);
 
 		// Subject, then the room address if it fits on the line: else it wraps to the clipped second line
 		.title {
@@ -90,7 +90,7 @@ rad-chat {
 			align-items: flex-start;
 			gap: 2px;
 			padding-left: .6rem;
-			border-left: 2px solid hsl(var(--hue) 60% 65%);
+			border-left: 2px solid hsl(var(--hue) var(--nick-sl));
 		}
 
 		.nick {
@@ -106,7 +106,7 @@ rad-chat {
 			max-width: 100%;
 			margin: 0;
 			padding: .3rem .7rem;
-			background: hsl(var(--hue) 22% 13%);
+			background: hsl(var(--hue) var(--bubble-sl));
 			white-space: pre-wrap;
 			overflow-wrap: anywhere;
 
@@ -128,7 +128,7 @@ rad-chat {
 		pre {
 			font-family: ui-monospace, monospace;
 			font-size: .9em;
-			background: rgb(0 0 0 / .3);
+			background: var(--sunk);
 		}
 
 		code {
@@ -274,7 +274,7 @@ rad-chat {
 		padding-bottom: max(.4rem, env(safe-area-inset-bottom));
 		border-top: 1px solid var(--line);
 		position: relative; // over the log, for the shadow and the typing line
-		box-shadow: 0 -4px 8px -4px rgb(0 0 0 / .6);
+		box-shadow: 0 -4px 8px -4px var(--shadow);
 
 		// Over the bottom of the log, no layout shift
 		.typing {
@@ -352,7 +352,7 @@ rad-chat {
 			grid-area: 3 / 1;
 			padding-inline: .5rem;
 			// Sunk between the player and the input
-			box-shadow: inset 0 6px 6px -6px rgb(0 0 0 / .7), inset 0 -6px 6px -6px rgb(0 0 0 / .7);
+			box-shadow: inset 0 6px 6px -6px var(--shadow), inset 0 -6px 6px -6px var(--shadow);
 		}
 
 		> div > form {

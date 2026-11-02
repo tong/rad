@@ -1,20 +1,47 @@
 @use 'pkg:enron/enron/color';
 @use 'sass:color' as c;
 
-$bg: #0b0b0b;
-$fg: #c6c6c6;
-$accent: #a7b3bb; // cool gray
-$error: #ff5f5f;
 $font: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 
-:root {
-	color-scheme: dark;
+// Colors of the scheme, from its background, text, accent and error color
+@mixin scheme($bg, $fg, $accent, $error, $dark) {
 	--bg: #{$bg};
-	--panel: #{color.tint($bg, 4%)};
-	--line: #{color.tint($bg, 14%)};
 	--fg: #{$fg};
-	--dim: #{color.shade($fg, 45%)};
 	--accent: #{$accent};
 	--button: #{c.mix($accent, $bg, 16%)};
 	--error: #{$error};
+	@if $dark {
+		color-scheme: dark;
+		--panel: #{color.tint($bg, 4%)};
+		--line: #{color.tint($bg, 14%)};
+		--dim: #{color.shade($fg, 45%)};
+		// Saturation and lightness of the nick colors, with `--hue`: names and lines, message bubbles
+		--nick-sl: 60% 65%;
+		--bubble-sl: 22% 13%;
+		// Drop shadows, and backgrounds sunk into the surface (code)
+		--shadow: rgb(0 0 0 / .65);
+		--sunk: rgb(0 0 0 / .3);
+	} @else {
+		color-scheme: light;
+		--panel: #{color.shade($bg, 3%)};
+		--line: #{color.shade($bg, 12%)};
+		--dim: #{color.tint($fg, 45%)};
+		--nick-sl: 55% 38%;
+		--bubble-sl: 30% 94%;
+		--shadow: rgb(0 0 0 / .18);
+		--sunk: rgb(0 0 0 / .06);
+	}
+}
+
+:root {
+	@include scheme(#0b0b0b, #c6c6c6, #a7b3bb, #ff5f5f, true); // accent: cool gray
+	@media (prefers-color-scheme: light) {
+		&:not([data-theme=dark]) {
+			@include scheme(#f7f7f5, #1f1f1f, #4f5d68, #c62828, false);
+		}
+	}
+	// Chosen in the settings, else the system preference
+	&[data-theme=light] {
+		@include scheme(#f7f7f5, #1f1f1f, #4f5d68, #c62828, false);
+	}
 }
