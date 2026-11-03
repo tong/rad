@@ -100,6 +100,11 @@ class App extends LitElement {
 			} else if (muc != null && !offline)
 				check();
 		});
+		// Asks before leaving the page while in a room: the browser shows its own message
+		window.addEventListener("beforeunload", (e:js.html.Event) -> if (muc != null) {
+			e.preventDefault();
+			js.Syntax.code("{0}.returnValue = true", e); // older browsers
+		});
 		// Closing or reloading the tab: leave now, else the server keeps the hibernated session (stream management) in the room for minutes
 		window.addEventListener("pagehide", () -> if (muc != null) logout());
 	}
@@ -111,7 +116,7 @@ class App extends LitElement {
 		busy = true;
 		error = null;
 		account = a;
-		if (Notification.permission == DEFAULT)
+		if (notifications && Notification.permission == DEFAULT)
 			js.Syntax.code("Notification.requestPermission()"); // missing in the extern, for mentions, asked on the join click
 		final jid:Jid = a.jid;
 		stream = new Stream(jid.domain);
@@ -204,9 +209,12 @@ class App extends LitElement {
 		});
 	}
 
+	/** Notifications are available: not in Safari on iPhone, only in web apps added to the home screen **/
+	static final notifications:Bool = js.Syntax.code("'Notification' in window");
+
 	/** System notification, throws where only service workers may notify (Android) **/
 	static function notify(nick:String, body:String)
-		if (Notification.permission == GRANTED)
+		if (notifications && Notification.permission == GRANTED)
 			try {
 				final n = new Notification(nick, {body: body, icon: "icons/icon-192.png"});
 				n.onclick = () -> {

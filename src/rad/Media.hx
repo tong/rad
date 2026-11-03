@@ -445,11 +445,19 @@ class MixcloudMedia extends Media {
 		});
 	}
 
+	/** The show from the api: `name`, `audio_length` **/
+	var info:Null<Promise<Dynamic>>;
+
+	function show():Promise<Dynamic>
+		return info ??= window.fetch('https://api.mixcloud.com$path').then(r -> r.json());
+
+	// From the api: on phones the widget knows the duration only once playing
 	function duration()
-		return widget.then(w -> Media.poll(w.getDuration));
+		return show().then(j -> (j.audio_length : Null<Float>) > 0 ? Promise.resolve((j.audio_length : Float)) : Promise.reject(null))
+			.catchError(_ -> widget.then(w -> Media.poll(w.getDuration)));
 
 	function title()
-		return window.fetch('https://api.mixcloud.com$path').then(r -> r.json()).then(j -> (j.name : Null<String>));
+		return show().then(j -> (j.name : Null<String>));
 
 	function position()
 		return widget.then(w -> w.getPosition());

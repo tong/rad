@@ -107,10 +107,36 @@ class Chat extends LitElement {
 		js.Browser.window.clearTimeout(pause);
 	}
 
+	/**
+		Shared to rad from another app (Web Share Target, see `manifest.json`): put into the input after joining, to send it.
+		Read once from the query of the start url, then removed from the address.
+	**/
+	static var shared:Null<String> = readShared();
+
+	static function readShared():Null<String> {
+		final location = js.Browser.window.location;
+		final q = new js.html.URLSearchParams(location.search);
+		final text = q.get("text") ?? "", title = q.get("title") ?? "";
+		var url = q.get("url") ?? "";
+		final link = ~/https?:\/\/\S+/;
+		if (url == "" && link.match(text)) // e.g. the YouTube app shares the link in the text
+			url = link.matched(0);
+		final value = (url != "") ? (Media.parse(url) != null ? '/play $url' : url) : (text != "") ? text : title;
+		if (value == "")
+			return null;
+		js.Browser.window.history.replaceState(null, "", location.pathname + location.hash);
+		return value;
+	}
+
 	/** Focuses the input on desktop only, on touch devices the keyboard would cover the chat **/
-	override function firstUpdated(changed:PropertyValues)
+	override function firstUpdated(changed:PropertyValues) {
+		if (shared != null) {
+			setInput(shared);
+			shared = null;
+		}
 		if (js.Browser.window.matchMedia("(pointer: fine)").matches)
 			input.focus();
+	}
 
 	override function updated(changed:PropertyValues) {
 		if (changed.has("messages"))

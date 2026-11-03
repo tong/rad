@@ -82,6 +82,7 @@ rad-chat {
 		flex-direction: column;
 		gap: .7rem;
 		padding: .7rem 1rem;
+		padding-bottom: 2rem; // room for the typing line over the bottom, see form .typing
 
 		// Consecutive messages of a sender: one name, joined bubbles, a line in the sender's color
 		.group {

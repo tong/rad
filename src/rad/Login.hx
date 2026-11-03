@@ -81,7 +81,8 @@ class Login extends LitElement {
 		final hash = StringTools.urlDecode(window.location.hash.substr(1));
 		if (key == "room" && hash != "")
 			return hash;
-		return (saved != null) ? Reflect.field(saved, key) ?? "" : "";
+		final v:String = (saved != null) ? Reflect.field(saved, key) ?? "" : "";
+		return (key == "room" && v == "") ? "disktree@conference.x.disktree.net" : v; // for now, the room in use
 	}
 
 	override function render()
@@ -94,7 +95,7 @@ class Login extends LitElement {
 			${config.room != null ? nothing : config.conference != null
 				? html(<label>room <input name="room" placeholder=${'name @${config.conference}'} required .value=${value("room")}></label>)
 				: html(<label>room <input name="room" type="email" placeholder="room@conference.example.com" required .value=${value("room")}></label>)}
-			${config.websocket != null ? nothing : html(<label>websocket <input name="websocket" placeholder="wss://example.com/xmpp-websocket (optional)" .value=${value("websocket")}></label>)}
+			${config.websocket != null ? nothing : html(<label>websocket <input name="websocket" .value=${value("websocket")}></label>)}
 			<button data-icon="join" ?disabled=${busy}>${busy ? "connecting…" : "join"}</button>
 			${error != null ? html(<p class="error">${error}</p>) : nothing}
 		</form>);
