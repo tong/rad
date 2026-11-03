@@ -8,15 +8,34 @@ rad-player {
 	position: relative;
 	min-height: 0;
 	border-right: 1px solid var(--line);
+	background: var(--panel); // set off from the chat
 
-	// Volume of the playing item, below the screen
-	.volume {
+	// Below the screen while playing: volume, skip
+	.bar {
 		display: flex;
 		align-items: center;
 		gap: .6rem;
 		padding: .3rem 1rem;
 		color: var(--dim);
 		border-bottom: 1px solid var(--line);
+		// Progress of the current item on the top edge, below the screen
+		background: linear-gradient(var(--accent), var(--accent)) left top / var(--progress, 0) 2px no-repeat;
+		.time {
+			margin-left: auto;
+			font-size: .85em;
+			font-variant-numeric: tabular-nums;
+			white-space: nowrap;
+		}
+		> button {
+			padding: .2rem .5rem;
+		}
+	}
+
+	.volume {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: .6rem;
 		input {
 			flex: 1;
 			min-width: 0;
@@ -82,28 +101,38 @@ rad-player {
 		flex: 1;
 		overflow-y: auto;
 		margin: 0;
-		padding: .5rem 1rem .5rem 3.5rem;
+		padding: .3rem .3rem .3rem 1.1rem;
 		// Sunk below the player, like the chat log on mobile
 		box-shadow: inset 0 6px 6px -6px var(--shadow), inset 0 -6px 6px -6px var(--shadow);
 
 		&:empty::before {
 			content: '/play <url> to start';
-			margin-left: -2.5rem;
+			margin-left: -.8rem;
 			color: var(--dim);
+		}
+
+		// Beside the chat: the scrollbar on the left, away from the chat's own. Right-to-left puts it there, the items stay left-to-right
+		@include break.min(md) {
+			direction: rtl;
+			> *,
+			&::before {
+				direction: ltr;
+			}
 		}
 	}
 
+	// No numbers, the order changes. The playing item is marked
 	li {
-		padding: .1rem 0;
+		padding: .4rem 0;
 		overflow-wrap: anywhere;
-
-		&::marker {
-			color: var(--dim);
+		list-style: none;
+		& + li {
+			border-top: 1px solid var(--line);
 		}
 
 		&.current {
+			list-style-type: '#{glyph.$black-right-pointing-triangle} ';
 			&::marker {
-				content: glyph.$black-right-pointing-triangle ' ';
 				color: var(--accent);
 			}
 			a {
@@ -113,6 +142,16 @@ rad-player {
 
 		&.played {
 			opacity: .4;
+			&:hover,
+			&:focus-within {
+				opacity: .8;
+			}
+			// Play again: with a mouse only on hover, touch devices always show it
+			@media (hover: hover) {
+				&:not(:hover) .item > button:not(:focus-visible) {
+					visibility: hidden;
+				}
+			}
 		}
 
 		a {
@@ -122,7 +161,31 @@ rad-player {
 			}
 		}
 
-		> span {
+		// In a box of its own: the li stays a list item, for the mark of the playing item
+		.item {
+			display: flex;
+			align-items: center;
+			gap: .6rem;
+			> div {
+				min-width: 0;
+			}
+			// Play again on played items, skip on the playing one, remove on upcoming ones
+			> button {
+				flex: none;
+				margin-left: auto;
+				padding: .2rem .4rem;
+			}
+		}
+
+		img {
+			flex: none;
+			width: 4rem;
+			aspect-ratio: 16 / 9;
+			object-fit: cover;
+			background: var(--sunk);
+		}
+
+		.muted {
 			display: block;
 			font-size: .85em;
 		}
@@ -135,9 +198,8 @@ rad-player {
 		overflow: hidden;
 		border-right: 0;
 		border-bottom: 1px solid var(--line);
-		// Stands apart from the chat below: lighter, casting a shadow on it
+		// Stands apart from the chat below, casting a shadow on it
 		z-index: 1;
-		background: var(--panel);
 		box-shadow: 0 4px 8px -4px var(--shadow);
 
 		.screen {
@@ -147,10 +209,10 @@ rad-player {
 		ol {
 			min-height: 0;
 			max-height: var(--player-height, 25dvh);
-			padding-right: .5rem;
-			padding-left: 2.5rem; // room for the numbers
+			padding-right: .25rem;
+			padding-left: 1rem; // room for the mark of the playing item
 			&:empty::before {
-				margin-left: -2rem;
+				margin-left: -.75rem;
 			}
 		}
 

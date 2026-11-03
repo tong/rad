@@ -92,6 +92,20 @@ rad-chat {
 			gap: 2px;
 			padding-left: .6rem;
 			border-left: 2px solid hsl(var(--hue) var(--nick-sl));
+
+			// Own messages on small screens: on the right, no name
+			@include break.max(md) {
+				&.own {
+					align-items: flex-end;
+					margin-left: 15%; // long messages stay right too
+					padding: 0 .6rem 0 0;
+					border-left: 0;
+					border-right: 2px solid hsl(var(--hue) var(--nick-sl));
+					> .nick {
+						display: none;
+					}
+				}
+			}
 		}
 
 		.nick {
@@ -115,6 +129,25 @@ rad-chat {
 			&.mention {
 				background: color-mix(in srgb, var(--accent) 22%, var(--bg));
 				box-shadow: inset 2px 0 var(--accent);
+			}
+		}
+
+		// Media link posted without /play
+		.media {
+			display: flex;
+			align-items: flex-end;
+			gap: .6rem;
+			margin: .3rem 0 .1rem;
+			white-space: normal;
+			img {
+				display: block;
+				width: 8rem;
+				aspect-ratio: 16 / 9;
+				object-fit: cover;
+			}
+			button {
+				padding: .1rem .5rem;
+				font-size: .85em;
 			}
 		}
 
@@ -156,8 +189,11 @@ rad-chat {
 			color: var(--dim);
 		}
 
-		// Playlist change: a line, no bubble
+		// Playlist change: a line, no bubble. Click shows its item in the playlist
 		.action {
+			&[data-items]:not([data-items='']) {
+				cursor: pointer;
+			}
 			display: flex;
 			align-items: baseline;
 			gap: 1.5ch;
@@ -259,6 +295,30 @@ rad-chat {
 			margin: 0 -1rem;
 			padding: 0 1rem;
 		}
+	}
+
+	// Playlist items connected to their messages, see Chat.drawLinks
+	svg.links {
+		position: fixed;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 1;
+		pointer-events: none;
+		path {
+			fill: none;
+			stroke: var(--accent);
+			stroke-width: 2;
+			stroke-linejoin: miter;
+		}
+		.end {
+			fill: var(--accent);
+			stroke: none;
+		}
+	}
+
+	.linked {
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
 	}
 
 	// Behind the user list slid in on small screens

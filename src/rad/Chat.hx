@@ -21,7 +21,10 @@ typedef Message = {
 	time:Date,
 
 	/** Event, e.g. "joined" or a playlist change "added …" **/
-	?action:Bool
+	?action:Bool,
+
+	/** Ids of the playlist items it added **/
+	?items:Array<String>
 }
 
 @:customElement("rad-chat")
@@ -73,6 +76,9 @@ class Chat extends LitElement {
 
 	@:state var settings = false;
 
+	/** The input holds only media links: a button adds them to the playlist **/
+	@:state var playable = false;
+
 	/** Re-renders the message ages **/
 	var timer:Null<Int>;
 
@@ -99,11 +105,21 @@ class Chat extends LitElement {
 	override function connectedCallback() {
 		super.connectedCallback();
 		timer = js.Browser.window.setInterval(requestUpdate, 30000);
+		linksTimer = js.Browser.window.setInterval(drawLinksSoon, 1000); // the playing item changes, thumbnails load
+		addEventListener("scroll", drawLinksSoon, true); // of the log and the playlist
+		addEventListener("mouseover", hover);
+		addEventListener("mouseleave", () -> {
+			hovered = null;
+			drawLinksSoon();
+		});
+		js.Browser.window.addEventListener("resize", drawLinksSoon);
 	}
 
 	override function disconnectedCallback() {
 		super.disconnectedCallback();
 		js.Browser.window.clearInterval(timer);
+		js.Browser.window.clearInterval(linksTimer);
+		js.Browser.window.removeEventListener("resize", drawLinksSoon);
 		js.Browser.window.clearTimeout(pause);
 	}
 
@@ -128,8 +144,29 @@ class Chat extends LitElement {
 		return value;
 	}
 
+	/**
+		Keeps `el` scrolled to the end when it is resized or content is added later, unless scrolled up:
+		the layout changes after the content arrived (the player loads, fonts), thumbnails of media links are inserted once looked up.
+	**/
+	public static function pinToEnd(el:js.html.Element):() -> Void {
+		var end = true;
+		final stick = () -> if (end) el.scrollTop = el.scrollHeight;
+		el.addEventListener("scroll", () -> end = el.scrollHeight - el.scrollTop - el.clientHeight < 40);
+		js.Syntax.code("new ResizeObserver({0}).observe({1})", stick, el); // no extern
+		new js.html.MutationObserver((_, _) -> stick()).observe(el, {childList: true, subtree: true});
+		// scrolls to the end, and stays there: content may follow before the scroll event says so
+		return () -> {
+			end = true;
+			stick();
+		}
+	}
+
+	/** Scrolls the log to the end, see `pinToEnd` **/
+	var toEnd:() -> Void = () -> {};
+
 	/** Focuses the input on desktop only, on touch devices the keyboard would cover the chat **/
 	override function firstUpdated(changed:PropertyValues) {
+		toEnd = pinToEnd(log);
 		if (shared != null) {
 			setInput(shared);
 			shared = null;
@@ -138,16 +175,96 @@ class Chat extends LitElement {
 			input.focus();
 	}
 
+	// --- Links between the playlist items and the chat messages that added them, side by side (desktop)
+
+	/** Item ids under the mouse, `null`: the playing item **/
+	var hovered:Null<Array<String>>;
+
+	var linksTimer = 0;
+	var linksFrame = 0;
+
+	function drawLinksSoon()
+		if (linksFrame == 0)
+			linksFrame = js.Browser.window.requestAnimationFrame(_ -> {
+				linksFrame = 0;
+				drawLinks();
+			});
+
+	function hover(e:js.html.MouseEvent) {
+		final el = (cast e.target : js.html.Element).closest("[data-item], [data-items]");
+		final ids = (el == null) ? [] : (el.dataset.item != null) ? [el.dataset.item] : el.dataset.items.split(" ").filter(s -> s != "");
+		hovered = (ids.length > 0) ? ids : null;
+		drawLinksSoon();
+	}
+
+	/** Lines with sharp turns from the items to their messages, to the edge with an arrow when scrolled out of view, both ends highlighted **/
+	function drawLinks() {
+		final svg = querySelector("svg.links"), list = querySelector("rad-player ol");
+		for (e in querySelectorAll(".linked"))
+			(cast e : js.html.Element).classList.remove("linked");
+		if (svg == null)
+			return;
+		svg.innerHTML = "";
+		if (list == null || !js.Browser.window.matchMedia("(width >= 64rem)").matches)
+			return;
+		final playing = querySelector("rad-player li.current .item");
+		final ids = hovered ?? ((playing != null) ? [playing.dataset.item] : []);
+		final lr = list.getBoundingClientRect(), gr = log.getBoundingClientRect();
+		final out = new StringBuf();
+		// a dot, or an arrow up/down when the element is out of view
+		function end(x:Float, y:Float, dir:Int)
+			out.add((dir == 0) ? '<circle class="end" cx="$x" cy="$y" r="3"/>' : '<path class="end" d="M${x - 4} ${y - 3 * dir}L$x ${y + 3 * dir}L${x + 4} ${y - 3 * dir}Z"/>');
+		function clamp(y:Float, r:js.html.DOMRect)
+			return (y < r.top + 8) ? {y: r.top + 8, dir: -1} : (y > r.bottom - 8) ? {y: r.bottom - 8, dir: 1} : {y: y, dir: 0};
+		for (id in ids) {
+			final css:String = js.Syntax.code("CSS.escape({0})", id);
+			final a = list.querySelector('.item[data-item="$css"]'), b = log.querySelector('[data-items~="$css"]');
+			if (a == null || b == null)
+				continue;
+			a.classList.add("linked");
+			b.classList.add("linked");
+			final ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+			final x1 = Math.min(ra.right, lr.right) + 2, x2 = Math.max(rb.left, gr.left) - 2;
+			final p1 = clamp(ra.top + ra.height / 2, lr), p2 = clamp(rb.top + rb.height / 2, gr);
+			final xm = Math.round((x1 + x2) / 2); // the vertical part, in the gap between the views
+			if (p1.dir != 0 && p1.dir == p2.dir)
+				continue; // both out of view on the same side
+			final dy = p2.y - p1.y, sy = (dy < 0) ? -1 : 1;
+			final r = Math.min(4, Math.min(Math.abs(dy) / 2, Math.min(xm - x1, x2 - xm))); // slightly rounded turns
+			// an end out of view: no turn into its view, the vertical part runs on to the edge
+			final start = (p1.dir == 0) ? 'M$x1 ${p1.y}H${xm - r}Q$xm ${p1.y} $xm ${p1.y + r * sy}' : 'M$xm ${p1.y}';
+			final finish = (p2.dir == 0) ? 'V${p2.y - r * sy}Q$xm ${p2.y} ${xm + r} ${p2.y}H$x2' : 'V${p2.y}';
+			out.add('<path d="$start$finish"/>');
+			end((p1.dir == 0) ? x1 : xm, p1.y, p1.dir);
+			end((p2.dir == 0) ? x2 : xm, p2.y, p2.dir);
+		}
+		svg.innerHTML = out.toString();
+	}
+
 	override function updated(changed:PropertyValues) {
+		drawLinksSoon();
 		if (changed.has("messages"))
-			log.scrollTop = log.scrollHeight;
+			toEnd();
 		if (changed.get("busy") == true && js.Browser.window.matchMedia("(pointer: fine)").matches)
 			input.focus(); // focus got lost while disabled
 	}
 
 	function submit(e:Event) {
 		e.preventDefault();
-		final body = StringTools.trim(input.value);
+		post(StringTools.trim(input.value));
+	}
+
+	/** Adds the media links in the input to the playlist: no `/play` to type on phones **/
+	function addToPlaylist()
+		post('/play ${StringTools.trim(input.value)}');
+
+	/** The input holds only media links **/
+	static function onlyMedia(value:String):Bool {
+		final words = ~/\s+/g.split(StringTools.trim(value));
+		return words[0] != "" && Lambda.foreach(words, w -> Media.parse(w) != null);
+	}
+
+	function post(body:String) {
 		if (body != "") {
 			SEND.dispatch(this, body);
 			sent.push(body);
@@ -160,6 +277,7 @@ class Chat extends LitElement {
 
 	/** Typing, stops after 5 seconds without input or when the input is cleared **/
 	function onInput() {
+		playable = onlyMedia(input.value);
 		js.Browser.window.clearTimeout(pause);
 		if (input.value == "")
 			return setComposing(false);
@@ -183,6 +301,14 @@ class Chat extends LitElement {
 	function tap(e:js.html.MouseEvent, m:Message)
 		if (m.id != null && js.Browser.window.matchMedia("(pointer: coarse)").matches && (cast e.target : js.html.Element).closest("a, button") == null)
 			pick(m.id);
+
+	/** Clicking an "added" line scrolls its playlist item into view, when it isn't **/
+	function showItem(e:js.html.MouseEvent, m:Message) {
+		if (m.items == null || m.items.length == 0 || (cast e.target : js.html.Element).closest("a, button") != null)
+			return;
+		final css:String = js.Syntax.code("CSS.escape({0})", m.items[0]);
+		querySelector('rad-player .item[data-item="$css"]')?.scrollIntoView({block: NEAREST, behavior: SMOOTH});
+	}
 
 	function reactButton(m:Message)
 		return (m.id == null) ? nothing : html(<button class="add" data-icon="react" title="react" aria-label="react" @click=${() -> pick(m.id)}></button>);
@@ -237,8 +363,10 @@ class Chat extends LitElement {
 		e.preventDefault();
 	}
 
-	function setInput(value:String)
+	function setInput(value:String) {
 		input.value = value;
+		playable = onlyMedia(value);
+	}
 
 	/** Consecutive messages of the same sender, at most 5 minutes apart **/
 	static function groups(messages:Array<Message>):Array<Array<Message>> {
@@ -301,6 +429,34 @@ class Chat extends LitElement {
 				}
 		];
 
+	/** Thumbnails of media links in messages, by url, looked up once **/
+	static final thumbs = new Map<String, js.lib.Promise<Null<String>>>();
+
+	/** Media links posted without `/play`: thumbnail and a button to add them to the playlist **/
+	function mediaLinks(m:Message):Renderable {
+		if (m.nick == "*")
+			return nothing;
+		final urls:Array<String> = [];
+		final r = ~/https?:\/\/[^\s<>"]+/;
+		var body = m.body;
+		while (r.match(body)) {
+			final url = r.matched(0);
+			if (Media.parse(url) != null && !urls.contains(url))
+				urls.push(url);
+			body = r.matchedRight();
+		}
+		return [
+			for (url in urls) {
+				if (!thumbs.exists(url))
+					thumbs[url] = Media.thumbnail(Media.parse(url)).catchError(_ -> null);
+				final thumb = thumbs[url].then(t -> (t != null && StringTools.startsWith(t, "https://"))
+					? html(<a href=${url} target="_blank"><img src=${t} alt="" referrerpolicy="no-referrer"/></a>)
+					: nothing);
+				html(<span class="media">${until(thumb, nothing)}<button data-icon="add" title="add to the playlist" @click=${() -> SEND.dispatch(this, '/play $url')}>play</button></span>);
+			}
+		];
+	}
+
 	/** Age of a message, e.g. `6m`, the date on hover **/
 	static function ago(date:Date) {
 		final s = (Date.now().getTime() - date.getTime()) / 1000;
@@ -343,17 +499,21 @@ class Chat extends LitElement {
 				<button data-icon="leave" title="leave" aria-label="leave" @click=${() -> LOGOUT.dispatch(this)}></button>
 			</header>
 			<rad-player .items=${items} .offset=${offset}></rad-player>
+			<svg class="links" aria-hidden="true"></svg>
 			<div class="log">
 				${map(groups(messages), g -> g[0].action
-					? ([html(<div class="action" style="--hue:${hue(g[0].nick)}" @click=${e -> tap(e, g[0])}><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}</span>${reactButton(g[0])}${ago(g[0].time)}</div>), reactionBar(g[0])] : Renderable)
-					: html(<div class=${g[0].nick == "*" ? "group notice" : "group"} style="--hue:${hue(g[0].nick)}">
+					? ([html(<div class="action" data-items=${(g[0].items ?? []).join(" ")} style="--hue:${hue(g[0].nick)}" @click=${e -> {
+						tap(e, g[0]);
+						showItem(e, g[0]);
+					}}><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}</span>${reactButton(g[0])}${ago(g[0].time)}</div>), reactionBar(g[0])] : Renderable)
+					: html(<div class=${g[0].nick == "*" ? "group notice" : g[0].nick == muc?.nick ? "group own" : "group"} style="--hue:${hue(g[0].nick)}">
 						<b class="nick">${g[0].nick}</b>
-						${map(g, m -> ([html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
+						${map(g, m -> ([html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}${mediaLinks(m)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
 					</div>))}
 			</div>
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>
 			${people ? html(<div class="backdrop" @click=${() -> people = false}></div>) : nothing}
 			${settings && muc != null ? html(<rad-settings .muc=${muc} @close=${Settings.CLOSE.listen(() -> settings = false)}></rad-settings>) : nothing}
-			<form @submit=${submit}>${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
+			<form @submit=${submit}>${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea>${playable && !busy ? html(<button type="button" data-icon="add" title="add to the playlist" aria-label="add to the playlist" @click=${addToPlaylist}></button>) : nothing}<button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
 		</div>);
 }

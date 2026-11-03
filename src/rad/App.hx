@@ -273,6 +273,7 @@ class App extends LitElement {
 					nick: nick,
 					body: m.body,
 					action: Lambda.exists(m.properties, e -> e.is(XMLNS_MEDIA)),
+					items: [for (e in m.properties) if (e.is(XMLNS_MEDIA) && e.name == "media") e["id"]],
 					time: time ?? Date.now()
 				}
 			]);
@@ -285,6 +286,7 @@ class App extends LitElement {
 									id: e["id"],
 									url: e["url"],
 									title: e["title"],
+									thumb: StringTools.startsWith(e["thumb"] ?? "", "https://") ? e["thumb"] : null, // set by the sender, no other urls
 									nick: nick,
 									duration: Std.parseFloat(e["duration"]),
 									time: Std.parseFloat(e["time"])
@@ -296,6 +298,7 @@ class App extends LitElement {
 								id: i.id,
 								url: i.url,
 								title: i.title,
+								thumb: i.thumb,
 								nick: i.nick,
 								duration: i.duration,
 								time: i.time,
@@ -343,16 +346,27 @@ class App extends LitElement {
 				probing = true;
 				js.lib.Promise.all([
 					for (url in urls)
-						Media.probe(Media.parse(url)).then(p -> XML.create("media")
-							.set("xmlns", XMLNS_MEDIA)
-							.set("id", StringTools.hex(Std.random(0x7fffffff)) + StringTools.hex(Std.random(0x7fffffff)))
-							.set("url", url)
-							.set("title", p.title ?? url)
-							.set("duration", Std.string(p.duration))
-							.set("time", Std.string(now)), _ -> {
-								notice('Could not load $url');
-								null;
-							})
+						js.lib.Promise.all([
+							Media.probe(Media.parse(url)),
+							// optional: no thumbnail after 3 seconds or on errors
+							js.lib.Promise.race([Media.thumbnail(Media.parse(url)), new js.lib.Promise((r, _) -> window.setTimeout(() -> r(null), 3000))])
+								.catchError(_ -> null)
+						]).then(r -> {
+							final p:{duration:Float, title:Null<String>} = r[0], thumb:Null<String> = r[1];
+							final e = XML.create("media")
+								.set("xmlns", XMLNS_MEDIA)
+								.set("id", StringTools.hex(Std.random(0x7fffffff)) + StringTools.hex(Std.random(0x7fffffff)))
+								.set("url", url)
+								.set("title", p.title ?? url)
+								.set("duration", Std.string(p.duration))
+								.set("time", Std.string(now));
+							if (thumb != null && StringTools.startsWith(thumb, "https://"))
+								e.set("thumb", thumb);
+							e;
+						}, _ -> {
+							notice('Could not load $url');
+							null;
+						})
 				]).then(media -> {
 					probing = false;
 					media = media.filter(e -> e != null);

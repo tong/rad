@@ -77,6 +77,19 @@ abstract class Media {
 		});
 	}
 
+	/** Url of a thumbnail image of `source`, `null` if none **/
+	public static function thumbnail(source:Source):Promise<Null<String>> {
+		function json(url:String):Promise<Dynamic>
+			return window.fetch(url).then(r -> r.json());
+		return switch source {
+			case YouTube(id): Promise.resolve('https://i.ytimg.com/vi/$id/mqdefault.jpg');
+			case Vimeo(url): json('https://vimeo.com/api/oembed.json?width=320&url=${StringTools.urlEncode(url)}').then(j -> j.thumbnail_url);
+			case SoundCloud(url): json('https://soundcloud.com/oembed?format=json&url=${StringTools.urlEncode(url)}').then(j -> j.thumbnail_url);
+			case Mixcloud(path): json('https://api.mixcloud.com$path').then(j -> j.pictures?.medium);
+			case File(_): Promise.resolve(null);
+		}
+	}
+
 	static function script(src:String, ?ready:(Dynamic->Void)->Void):Promise<Dynamic> {
 		if (!scripts.exists(src))
 			scripts.set(src, new Promise((resolve, reject) -> {
@@ -289,7 +302,9 @@ class YouTubeMedia extends Media {
 						}
 						resolve(e.target);
 					},
-					onError: e -> fail(e.data)
+					onError: e -> fail(e.data),
+					// no captions: no option turns them off, unloading the module is undocumented, it loads with the playback
+					onApiChange: e -> try e.target.unloadModule("captions") catch (_) {}
 				}
 			})));
 	}

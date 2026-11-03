@@ -10,6 +10,10 @@ typedef Track = {
 	id:String,
 	url:String,
 	?title:String,
+
+	/** Url of a thumbnail image, https **/
+	?thumb:String,
+
 	nick:String,
 
 	/** Length in seconds **/
@@ -41,9 +45,16 @@ class Player extends LitElement {
 	@:query("ol") var list:js.html.Element;
 
 	var current:Null<Track>;
+
+	/** Start of the current item, server time in ms **/
+	var start = 0.0;
+
 	var media:Null<Media>;
 	var timer = 0;
 	var ticks = 0;
+
+	/** Scrolls the list to the end, see `Chat.pinToEnd` **/
+	var toEnd:() -> Void = () -> {};
 
 	/** Items when last rendered, the list scrolls to a new one **/
 	var count = 0;
@@ -84,9 +95,12 @@ class Player extends LitElement {
 		}
 	}
 
+	override function firstUpdated(changed:lit.PropertyValues)
+		toEnd = Chat.pinToEnd(list);
+
 	override function updated(changed:lit.PropertyValues) {
 		if (items.length > count)
-			list.scrollTop = list.scrollHeight;
+			toEnd();
 		count = items.length;
 	}
 
@@ -119,13 +133,15 @@ class Player extends LitElement {
 	function tick() {
 		final now = Date.now().getTime() + offset;
 		final playing = Lambda.find(schedule(items), s -> now >= s.start && now < s.end);
-		if (playing?.item != current) {
+		final changed = playing?.item != current;
+		if (changed) {
 			media?.destroy();
 			media = null;
 			current = playing?.item;
-			if (playing != null)
+			if (playing != null) {
+				start = playing.start;
 				media = Media.create(Media.parse(current.url), screen, () -> (Date.now().getTime() + offset - playing.start) / 1000);
-			requestUpdate();
+			}
 		} else if (media != null && ++ticks % 5 == 0) {
 			media.position().then(pos -> {
 				final want = (Date.now().getTime() + offset - playing.start) / 1000;
@@ -133,6 +149,8 @@ class Player extends LitElement {
 					media.seek(want);
 			});
 		}
+		if (changed || current != null)
+			requestUpdate(); // also the position, every second
 	}
 
 	/** Toggles fullscreen of the screen, the players have no controls for it **/
@@ -158,13 +176,39 @@ class Player extends LitElement {
 	override function render()
 		return html(<div style="display:contents">
 			<div class="screen" @click=${() -> media?.click()} @dblclick=${fullscreen}></div>
-			${current != null && Media.adjustable ? html(<label class="volume" data-icon="volume" title="volume">
-				<input type="range" min="0" max="1" step="0.01" aria-label="volume" .value=${Std.string(Media.level)} @input=${(e:js.html.Event) -> media?.volume(Media.level = Std.parseFloat((cast e.target : js.html.InputElement).value))}>
-			</label>) : nothing}
+			${current == null ? nothing : html(<div class="bar" style="--progress:${elapsed() / current.duration * 100}%">
+				${Media.adjustable ? html(<label class="volume" data-icon="volume" title="volume">
+					<input type="range" min="0" max="1" step="0.01" aria-label="volume" .value=${Std.string(Media.level)} @input=${(e:js.html.Event) -> media?.volume(Media.level = Std.parseFloat((cast e.target : js.html.InputElement).value))}>
+				</label>) : nothing}
+				<span class="time">${format(elapsed())} / ${format(current.duration)}</span>
+				<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>
+			</div>)}
 			<div class="split" @pointerdown=${drag}></div>
-			<ol>${map(schedule(items), s -> html(<li class=${classMap({current: s.item == current, played: s.end < Date.now().getTime() + offset})}>
-					<a href=${s.item.url} target="_blank" data-icon=${icon(s.item.url)}>${s.item.title ?? s.item.url}</a>
-					<span class="muted">${format(s.item.duration)} · <span class="nick" style="--hue:${Chat.hue(s.item.nick)}">${s.item.nick}</span> · ${DateTools.format(Date.fromTime(s.item.time - offset), "%Y-%m-%d %H:%M")}</span>
-				</li>))}</ol>
+			<ol>${map(schedule(items), s -> played(s) ? html(<li class="played">${item(s.item, html(<button data-icon="add" title="play again" aria-label="play again" @click=${() -> Chat.SEND.dispatch(this, '/play ${s.item.url}')}></button>))}</li>) : s.item == current ? html(<li class="current">${item(s.item, html(<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>))}</li>) : html(<li>${item(s.item, html(<button data-icon="close" title="remove" aria-label="remove" @click=${() -> removeItem(s.item)}></button>))}</li>))}</ol>
+		</div>);
+
+	/** Position in the current item in seconds, the time all clients sync to **/
+	function elapsed()
+		return Math.max(0, Math.min((Date.now().getTime() + offset - start) / 1000, current.duration));
+
+	/** Removes an upcoming item: `/remove` with its number at the time of the click **/
+	function removeItem(t:Track) {
+		final i = Lambda.findIndex(schedule(items), s -> s.item.id == t.id);
+		if (i >= 0)
+			Chat.SEND.dispatch(this, '/remove ${i + 1}');
+	}
+
+	function played(s:{item:Track, end:Float})
+		return s.end < Date.now().getTime() + offset;
+
+	/** An item, `action`: a button at the end **/
+	function item(t:Track, ?action:lit.Renderable)
+		return html(<div class="item" data-item=${t.id}>
+			${t.thumb != null ? html(<img src=${t.thumb} alt="" loading="lazy" referrerpolicy="no-referrer"/>) : nothing}
+			<div>
+				<a href=${t.url} target="_blank" data-icon=${icon(t.url)}>${t.title ?? t.url}</a>
+				<span class="muted">${format(t.duration)} · <span class="nick" style="--hue:${Chat.hue(t.nick)}">${t.nick}</span> · ${DateTools.format(Date.fromTime(t.time - offset), "%Y-%m-%d %H:%M")}</span>
+			</div>
+			${action ?? nothing}
 		</div>);
 }
