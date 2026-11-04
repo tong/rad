@@ -23,11 +23,11 @@ abstract class Media {
 	/** Returns the media source of `url`, `null` if not playable **/
 	public static function parse(url:String):Null<Source> {
 		final u = try new js.html.URL(url) catch (_) return null;
-		final path = ~/^\/(shorts|live|embed)\/([\w-]+)/;
+		final path = ~/^\/(shorts|live|embed)\/([\w-]+)/, short = ~/^\/([\w-]+)/;
 		return switch ~/^(www|m|music)\./.replace(u.hostname, "") {
 			case "youtube.com" if (u.searchParams.has("v")): YouTube(u.searchParams.get("v"));
 			case "youtube.com" if (path.match(u.pathname)): YouTube(path.matched(2));
-			case "youtu.be" if (u.pathname.length > 1): YouTube(u.pathname.substr(1));
+			case "youtu.be" if (short.match(u.pathname)): YouTube(short.matched(1));
 			case "vimeo.com" | "player.vimeo.com" if (~/\/\d+/.match(u.pathname)): Vimeo(url);
 			case "soundcloud.com": SoundCloud(url);
 			case "mixcloud.com": Mixcloud(u.pathname);
@@ -95,7 +95,11 @@ abstract class Media {
 			scripts.set(src, new Promise((resolve, reject) -> {
 				final s = document.createScriptElement();
 				s.src = src;
-				s.onerror = reject;
+				s.onerror = e -> {
+					scripts.remove(src); // loaded again on the next try, e.g. once online
+					s.remove();
+					reject(e);
+				}
 				if (ready != null) ready(resolve) else s.onload = resolve;
 				document.head.append(s);
 			}));
@@ -243,10 +247,11 @@ class FileMedia extends Media {
 
 	function duration()
 		return new Promise((resolve, reject) -> {
+			fail = reject;
 			if (video.readyState > 0)
 				resolve(video.duration);
-			video.addEventListener("loadedmetadata", () -> resolve(video.duration));
-			fail = reject;
+			else
+				video.addEventListener("loadedmetadata", () -> resolve(video.duration), {once: true});
 		});
 
 	function title()

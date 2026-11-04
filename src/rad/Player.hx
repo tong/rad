@@ -138,10 +138,9 @@ class Player extends LitElement {
 			media?.destroy();
 			media = null;
 			current = playing?.item;
-			if (playing != null) {
-				start = playing.start;
-				media = Media.create(Media.parse(current.url), screen, () -> (Date.now().getTime() + offset - playing.start) / 1000);
-			}
+			final source = (current == null) ? null : Media.parse(current.url);
+			if (source != null) // else unknown to this version
+				media = Media.create(source, screen, () -> (Date.now().getTime() + offset - playing.start) / 1000);
 		} else if (media != null && ++ticks % 5 == 0) {
 			media.position().then(pos -> {
 				final want = (Date.now().getTime() + offset - playing.start) / 1000;
@@ -149,6 +148,8 @@ class Player extends LitElement {
 					media.seek(want);
 			});
 		}
+		if (playing != null)
+			start = playing.start; // moves when an item delivered late is scheduled before
 		if (changed || current != null)
 			requestUpdate(); // also the position, every second
 	}

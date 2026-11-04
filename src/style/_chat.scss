@@ -191,9 +191,6 @@ rad-chat {
 
 		// Playlist change: a line, no bubble. Click shows its item in the playlist
 		.action {
-			&[data-items]:not([data-items='']) {
-				cursor: pointer;
-			}
 			display: flex;
 			align-items: baseline;
 			gap: 1.5ch;
@@ -201,6 +198,9 @@ rad-chat {
 			color: var(--dim);
 			white-space: pre-wrap;
 			overflow-wrap: anywhere;
+			&[data-items]:not([data-items='']) {
+				cursor: pointer;
+			}
 			.nick {
 				font-size: 1em;
 			}

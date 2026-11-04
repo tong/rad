@@ -122,7 +122,7 @@ class App extends LitElement {
 		stream = new Stream(jid.domain);
 		stream.framing = true;
 		stream.output = str -> {
-			js.Browser.console.debug("%c→ " + str, "color:#e8a");
+			js.Browser.console.debug("%c→ " + (StringTools.startsWith(str, "<auth") ? "<auth…/>" : str), "color:#e8a"); // not the password
 			ws.send(str);
 		}
 		stream.onEnd = () -> drop("Stream closed");
@@ -138,7 +138,7 @@ class App extends LitElement {
 	function connect() {
 		retry = null;
 		final a = account, jid:Jid = account.jid;
-		ws = new WebSocket(a.websocket, xmpp.net.WebSocket.PROTOCOL);
+		ws = try new WebSocket(a.websocket, xmpp.net.WebSocket.PROTOCOL) catch (_) return close('Cannot connect to ${a.websocket}'); // invalid address, or ws:// from https
 		ws.onmessage = e -> {
 			received = Date.now().getTime();
 			js.Browser.console.debug("%c← " + e.data, "color:#8ae");
@@ -280,7 +280,7 @@ class App extends LitElement {
 			for (e in m.properties)
 				if (e.is(XMLNS_MEDIA))
 					switch e.name {
-						case "media":
+						case "media" if (e["id"] != null && e["url"] != null && !Lambda.exists(items, i -> i.id == e["id"])): // once, e.g. history after a reconnect
 							items = items.concat([
 								{
 									id: e["id"],
@@ -344,6 +344,7 @@ class App extends LitElement {
 				if (urls.length == 0)
 					return notice("Usage: /play <url> (YouTube, Vimeo, SoundCloud, Mixcloud or a media file)");
 				probing = true;
+				final room = muc; // the result is dropped after leaving it
 				js.lib.Promise.all([
 					for (url in urls)
 						js.lib.Promise.all([
@@ -364,10 +365,13 @@ class App extends LitElement {
 								e.set("thumb", thumb);
 							e;
 						}, _ -> {
-							notice('Could not load $url');
+							if (muc == room)
+								notice('Could not load $url');
 							null;
 						})
 				]).then(media -> {
+					if (muc != room)
+						return;
 					probing = false;
 					media = media.filter(e -> e != null);
 					if (media.length > 0)

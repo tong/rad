@@ -120,6 +120,7 @@ class Chat extends LitElement {
 		js.Browser.window.clearInterval(timer);
 		js.Browser.window.clearInterval(linksTimer);
 		js.Browser.window.removeEventListener("resize", drawLinksSoon);
+		js.Browser.window.cancelAnimationFrame(linksFrame);
 		js.Browser.window.clearTimeout(pause);
 	}
 
@@ -243,8 +244,8 @@ class Chat extends LitElement {
 
 	override function updated(changed:PropertyValues) {
 		drawLinksSoon();
-		if (changed.has("messages"))
-			toEnd();
+		if (changed.has("messages") && own(messages[messages.length - 1]))
+			toEnd(); // also when scrolled up to read: the own message, or the answer to a command
 		if (changed.get("busy") == true && js.Browser.window.matchMedia("(pointer: fine)").matches)
 			input.focus(); // focus got lost while disabled
 	}
@@ -467,6 +468,10 @@ class Chat extends LitElement {
 	/** Body contains `@` and the nick **/
 	public static function mentions(body:String, nick:String)
 		return new EReg('@${EReg.escape(nick)}(?![\\w-])', "i").match(body);
+
+	/** Own message, or a notice: the answer to an own command **/
+	function own(m:Null<Message>)
+		return m != null && (m.nick == "*" || m.nick == muc?.nick);
 
 	function mentionsMe(m:Message)
 		return muc != null && m.nick != muc.nick && mentions(m.body, muc.nick);
