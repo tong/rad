@@ -76,9 +76,6 @@ class Chat extends LitElement {
 
 	@:state var settings = false;
 
-	/** The input holds only media links: a button adds them to the playlist **/
-	@:state var playable = false;
-
 	/** Re-renders the message ages **/
 	var timer:Null<Int>;
 
@@ -138,7 +135,7 @@ class Chat extends LitElement {
 		final link = ~/https?:\/\/\S+/;
 		if (url == "" && link.match(text)) // e.g. the YouTube app shares the link in the text
 			url = link.matched(0);
-		final value = (url != "") ? (Media.parse(url) != null ? '/play $url' : url) : (text != "") ? text : title;
+		final value = (url != "") ? url : (text != "") ? text : title;
 		if (value == "")
 			return null;
 		js.Browser.window.history.replaceState(null, "", location.pathname + location.hash);
@@ -169,7 +166,7 @@ class Chat extends LitElement {
 	override function firstUpdated(changed:PropertyValues) {
 		toEnd = pinToEnd(log);
 		if (shared != null) {
-			setInput(shared);
+			input.value = shared;
 			shared = null;
 		}
 		if (js.Browser.window.matchMedia("(pointer: fine)").matches)
@@ -255,12 +252,8 @@ class Chat extends LitElement {
 		post(StringTools.trim(input.value));
 	}
 
-	/** Adds the media links in the input to the playlist: no `/play` to type on phones **/
-	function addToPlaylist()
-		post('/play ${StringTools.trim(input.value)}');
-
-	/** The input holds only media links **/
-	static function onlyMedia(value:String):Bool {
+	/** Only media links: posted, they are added to the playlist **/
+	public static function onlyMedia(value:String):Bool {
 		final words = ~/\s+/g.split(StringTools.trim(value));
 		return words[0] != "" && Lambda.foreach(words, w -> Media.parse(w) != null);
 	}
@@ -271,14 +264,13 @@ class Chat extends LitElement {
 			sent.push(body);
 		}
 		browse = sent.length;
-		setInput("");
+		input.value = "";
 		js.Browser.window.clearTimeout(pause);
 		composing = false; // the message says it
 	}
 
 	/** Typing, stops after 5 seconds without input or when the input is cleared **/
 	function onInput() {
-		playable = onlyMedia(input.value);
 		js.Browser.window.clearTimeout(pause);
 		if (input.value == "")
 			return setComposing(false);
@@ -355,18 +347,13 @@ class Chat extends LitElement {
 			case "ArrowUp" if (browse > 0 && value.lastIndexOf("\n", input.selectionStart - 1) == -1):
 				if (browse == sent.length)
 					draft = value;
-				setInput(sent[--browse]);
+				input.value = sent[--browse];
 			case "ArrowDown" if (browse < sent.length && value.indexOf("\n", input.selectionEnd) == -1):
-				setInput((++browse == sent.length) ? draft : sent[browse]);
+				input.value = (++browse == sent.length) ? draft : sent[browse];
 			case _:
 				return;
 		}
 		e.preventDefault();
-	}
-
-	function setInput(value:String) {
-		input.value = value;
-		playable = onlyMedia(value);
 	}
 
 	/** Consecutive messages of the same sender, at most 5 minutes apart **/
@@ -433,7 +420,7 @@ class Chat extends LitElement {
 	/** Thumbnails of media links in messages, by url, looked up once **/
 	static final thumbs = new Map<String, js.lib.Promise<Null<String>>>();
 
-	/** Media links posted without `/play`: thumbnail and a button to add them to the playlist **/
+	/** Media links posted within other text: thumbnail and a button to add them to the playlist **/
 	function mediaLinks(m:Message):Renderable {
 		if (m.nick == "*")
 			return nothing;
@@ -453,7 +440,7 @@ class Chat extends LitElement {
 				final thumb = thumbs[url].then(t -> (t != null && StringTools.startsWith(t, "https://"))
 					? html(<a href=${url} target="_blank"><img src=${t} alt="" referrerpolicy="no-referrer"/></a>)
 					: nothing);
-				html(<span class="media">${until(thumb, nothing)}<button data-icon="add" title="add to the playlist" @click=${() -> SEND.dispatch(this, '/play $url')}>play</button></span>);
+				html(<span class="media">${until(thumb, nothing)}<button data-icon="add" title="add to the playlist" @click=${() -> SEND.dispatch(this, url)}>play</button></span>);
 			}
 		];
 	}
@@ -519,6 +506,6 @@ class Chat extends LitElement {
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>
 			${people ? html(<div class="backdrop" @click=${() -> people = false}></div>) : nothing}
 			${settings && muc != null ? html(<rad-settings .muc=${muc} @close=${Settings.CLOSE.listen(() -> settings = false)}></rad-settings>) : nothing}
-			<form @submit=${submit}>${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea>${playable && !busy ? html(<button type="button" data-icon="add" title="add to the playlist" aria-label="add to the playlist" @click=${addToPlaylist}></button>) : nothing}<button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
+			<form @submit=${submit}>${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
 		</div>);
 }

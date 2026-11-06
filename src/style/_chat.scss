@@ -6,7 +6,7 @@
 rad-chat {
 	display: grid;
 	// --player-width is set by dragging the player border
-	grid-template: auto minmax(0, 1fr) auto / var(--player-width, minmax(0, 3fr)) minmax(0, 2fr) fit-content(240px);
+	grid-template: auto minmax(0, 1fr) auto / var(--player-width, minmax(0, 3fr)) minmax(0, 2fr);
 	height: 100%;
 	height: 100dvh; // mobile: excludes the browser toolbars
 	padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
@@ -14,7 +14,7 @@ rad-chat {
 	// Nothing playing: narrow player, more room for the chat
 	@include break.min(md) {
 		&:has(.screen:empty) {
-			grid-template-columns: var(--player-width, 20rem) minmax(0, 1fr) fit-content(240px);
+			grid-template-columns: var(--player-width, 20rem) minmax(0, 1fr);
 		}
 	}
 
@@ -63,9 +63,8 @@ rad-chat {
 			color: var(--error);
 		}
 
-		// User count, instead of the user list on small screens
+		// User count, toggles the user list
 		.count {
-			display: none;
 			flex: none;
 			color: var(--dim);
 		}
@@ -132,7 +131,7 @@ rad-chat {
 			}
 		}
 
-		// Media link posted without /play
+		// Media link posted within other text
 		.media {
 			display: flex;
 			align-items: flex-end;
@@ -276,14 +275,28 @@ rad-chat {
 		}
 	}
 
+	// Slides in from the right, toggled by the user count
 	> div > ul {
-		grid-area: 2 / 3 / 4;
+		position: fixed;
+		z-index: 3;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		width: max-content; // the longest nick
+		max-width: 80vw;
 		margin: 0;
-		padding: .5rem 1rem;
+		padding: max(.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) 1rem;
 		list-style: none;
 		overflow-y: auto;
 		border-left: 1px solid var(--line);
 		background: var(--panel);
+		transform: translateX(100%);
+		visibility: hidden;
+		transition: transform .2s, visibility .2s;
+		&.open {
+			transform: none;
+			visibility: visible;
+		}
 		li {
 			@include layout.no-text-overflow;
 		}
@@ -321,9 +334,12 @@ rad-chat {
 		background: color-mix(in srgb, var(--accent) 10%, transparent);
 	}
 
-	// Behind the user list slid in on small screens
+	// Behind the user list slid in
 	.backdrop {
-		display: none;
+		position: fixed;
+		z-index: 2;
+		inset: 0;
+		background: rgb(0 0 0 / .5);
 	}
 
 	> div > form {
@@ -375,38 +391,8 @@ rad-chat {
 	@include break.max(md) {
 		grid-template: auto auto minmax(0, 1fr) auto / minmax(0, 1fr);
 
-		// Slides in from the right, toggled by the user count
-		> div > ul {
-			position: fixed;
-			z-index: 3;
-			top: 0;
-			right: 0;
-			bottom: 0;
-			width: max-content; // the longest nick
-			max-width: 80vw;
-			padding: max(.5rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) 1rem;
-			transform: translateX(100%);
-			visibility: hidden;
-			transition: transform .2s, visibility .2s;
-			&.open {
-				transform: none;
-				visibility: visible;
-			}
-		}
-
-		.backdrop {
-			display: block;
-			position: fixed;
-			z-index: 2;
-			inset: 0;
-			background: rgb(0 0 0 / .5);
-		}
-
 		> div > header {
 			justify-content: space-between;
-			.count {
-				display: inline-flex;
-			}
 		}
 
 		.log {

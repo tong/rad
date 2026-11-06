@@ -106,7 +106,7 @@ rad-player {
 		box-shadow: inset 0 6px 6px -6px var(--shadow), inset 0 -6px 6px -6px var(--shadow);
 
 		&:empty::before {
-			content: '/play <url> to start';
+			content: 'post a link to start';
 			margin-left: -.8rem;
 			color: var(--dim);
 		}

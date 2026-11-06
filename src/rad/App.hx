@@ -60,7 +60,7 @@ class App extends LitElement {
 	/** Messages received while the page was hidden **/
 	@:state var unread = 0;
 
-	/** Media of a `/play` command is loading **/
+	/** Media of posted links is loading **/
 	@:state var probing = false;
 
 	/** Disconnected, reconnecting **/
@@ -322,9 +322,8 @@ class App extends LitElement {
 	}
 
 	/**
-		Sends a message to the room. Commands:
+		Sends a message to the room. Only media links: adds them to the playlist. Commands:
 
-		- `/play <url>…` adds media to the playlist
 		- `/skip` removes the playing item
 		- `/remove <n>` removes item `n` of the playlist
 		- `/help` lists the commands
@@ -335,18 +334,15 @@ class App extends LitElement {
 		final slots = Player.schedule(items);
 		switch args[0] {
 			case "/help":
-				notice("/play <url> …   add YouTube, Vimeo, SoundCloud, Mixcloud or media file links to the playlist
+				notice("post YouTube, Vimeo, SoundCloud, Mixcloud or media file links to add them to the playlist
 /skip           remove the playing item
 /remove <n>     remove item n of the playlist
 /help           list the commands");
-			case "/play":
-				final urls = args.slice(1).filter(u -> Media.parse(u) != null);
-				if (urls.length == 0)
-					return notice("Usage: /play <url> (YouTube, Vimeo, SoundCloud, Mixcloud or a media file)");
+			case _ if (Chat.onlyMedia(body)):
 				probing = true;
 				final room = muc; // the result is dropped after leaving it
 				js.lib.Promise.all([
-					for (url in urls)
+					for (url in args)
 						js.lib.Promise.all([
 							Media.probe(Media.parse(url)),
 							// optional: no thumbnail after 3 seconds or on errors

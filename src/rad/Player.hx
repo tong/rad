@@ -185,7 +185,7 @@ class Player extends LitElement {
 				<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>
 			</div>)}
 			<div class="split" @pointerdown=${drag}></div>
-			<ol>${map(schedule(items), s -> played(s) ? html(<li class="played">${item(s.item, html(<button data-icon="add" title="play again" aria-label="play again" @click=${() -> Chat.SEND.dispatch(this, '/play ${s.item.url}')}></button>))}</li>) : s.item == current ? html(<li class="current">${item(s.item, html(<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>))}</li>) : html(<li>${item(s.item, html(<button data-icon="close" title="remove" aria-label="remove" @click=${() -> removeItem(s.item)}></button>))}</li>))}</ol>
+			<ol>${map(schedule(items), s -> played(s) ? html(<li class="played">${item(s.item, html(<button data-icon="add" title="play again" aria-label="play again" @click=${() -> Chat.SEND.dispatch(this, s.item.url)}></button>))}</li>) : s.item == current ? html(<li class="current">${item(s.item, html(<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>))}</li>) : html(<li>${item(s.item, html(<button data-icon="close" title="remove" aria-label="remove" @click=${() -> removeItem(s.item)}></button>))}</li>))}</ol>
 		</div>);
 
 	/** Position in the current item in seconds, the time all clients sync to **/
