@@ -205,7 +205,7 @@ class Player extends LitElement {
 	/** An item, `action`: a button at the end **/
 	function item(t:Track, ?action:lit.Renderable)
 		return html(<div class="item" data-item=${t.id}>
-			${t.thumb != null ? html(<img src=${t.thumb} alt="" loading="lazy" referrerpolicy="no-referrer"/>) : nothing}
+			${t.thumb != null ? html(<img src=${t.thumb} alt="" title=${t.title ?? t.url} loading="lazy" referrerpolicy="no-referrer"/>) : nothing}
 			<div>
 				<a href=${t.url} target="_blank" data-icon=${icon(t.url)}>${t.title ?? t.url}</a>
 				<span class="muted">${format(t.duration)} · <span class="nick" style="--hue:${Chat.hue(t.nick)}">${t.nick}</span> · ${DateTools.format(Date.fromTime(t.time - offset), "%Y-%m-%d %H:%M")}</span>

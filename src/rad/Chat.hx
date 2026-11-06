@@ -76,6 +76,12 @@ class Chat extends LitElement {
 
 	@:state var settings = false;
 
+	/** Media links in the input, previewed above it **/
+	@:state var links:Array<String> = [];
+
+	/** The input holds only media links: sent, they are added to the playlist **/
+	@:state var playable = false;
+
 	/** Re-renders the message ages **/
 	var timer:Null<Int>;
 
@@ -168,6 +174,7 @@ class Chat extends LitElement {
 		if (shared != null) {
 			input.value = shared;
 			shared = null;
+			readInput();
 		}
 		if (js.Browser.window.matchMedia("(pointer: fine)").matches)
 			input.focus();
@@ -265,17 +272,27 @@ class Chat extends LitElement {
 		}
 		browse = sent.length;
 		input.value = "";
+		readInput();
 		js.Browser.window.clearTimeout(pause);
 		composing = false; // the message says it
 	}
 
 	/** Typing, stops after 5 seconds without input or when the input is cleared **/
 	function onInput() {
+		readInput();
 		js.Browser.window.clearTimeout(pause);
 		if (input.value == "")
 			return setComposing(false);
 		setComposing(true);
 		pause = js.Browser.window.setTimeout(() -> setComposing(false), 5000);
+	}
+
+	/** Updates the preview of the media links in the input **/
+	function readInput() {
+		final l = mediaUrls(input.value);
+		if (l.join(" ") != links.join(" "))
+			links = l;
+		playable = onlyMedia(input.value);
 	}
 
 	function setComposing(v:Bool)
@@ -353,6 +370,7 @@ class Chat extends LitElement {
 			case _:
 				return;
 		}
+		readInput();
 		e.preventDefault();
 	}
 
@@ -420,30 +438,45 @@ class Chat extends LitElement {
 	/** Thumbnails of media links in messages, by url, looked up once **/
 	static final thumbs = new Map<String, js.lib.Promise<Null<String>>>();
 
-	/** Media links posted within other text: thumbnail and a button to add them to the playlist **/
-	function mediaLinks(m:Message):Renderable {
-		if (m.nick == "*")
-			return nothing;
+	/** The thumbnail of a media link once looked up, nothing if it has none **/
+	static function thumbnail(url:String) {
+		if (!thumbs.exists(url))
+			thumbs[url] = Media.thumbnail(Media.parse(url)).catchError(_ -> null);
+		return until(thumbs[url].then(t -> (t != null && StringTools.startsWith(t, "https://")) ? html(<img src=${t} alt="" referrerpolicy="no-referrer"/>) : nothing), nothing);
+	}
+
+	/** Media links in `text`, each once **/
+	static function mediaUrls(text:String):Array<String> {
 		final urls:Array<String> = [];
 		final r = ~/https?:\/\/[^\s<>"]+/;
-		var body = m.body;
-		while (r.match(body)) {
+		while (r.match(text)) {
 			final url = r.matched(0);
 			if (Media.parse(url) != null && !urls.contains(url))
 				urls.push(url);
-			body = r.matchedRight();
+			text = r.matchedRight();
 		}
-		return [
-			for (url in urls) {
-				if (!thumbs.exists(url))
-					thumbs[url] = Media.thumbnail(Media.parse(url)).catchError(_ -> null);
-				final thumb = thumbs[url].then(t -> (t != null && StringTools.startsWith(t, "https://"))
-					? html(<a href=${url} target="_blank"><img src=${t} alt="" referrerpolicy="no-referrer"/></a>)
-					: nothing);
-				html(<span class="media">${until(thumb, nothing)}<button data-icon="add" title="add to the playlist" @click=${() -> SEND.dispatch(this, url)}>play</button></span>);
-			}
-		];
+		return urls;
 	}
+
+	/** Media links posted within other text: thumbnail and a button to add them to the playlist **/
+	function mediaLinks(m:Message):Renderable
+		return (m.nick == "*") ? nothing : [
+			for (url in mediaUrls(m.body))
+				html(<span class="media"><a href=${url} target="_blank">${thumbnail(url)}</a><button data-icon="add" title="add to the playlist" @click=${() -> SEND.dispatch(this, url)}>play</button></span>)
+		];
+
+	/** Thumbnails of the playlist items a message added **/
+	function itemThumbs(m:Message):Renderable {
+		final urls = [for (id in m.items ?? []) Lambda.find(items, i -> i.id == id)?.thumb].filter(t -> t != null);
+		return (urls.length == 0) ? nothing : html(<span class="thumbs">${map(urls, t -> html(<img src=${t} alt="" loading="lazy" referrerpolicy="no-referrer"/>))}</span>);
+	}
+
+	/** Media links in the input: their thumbnails, sent alone they are added to the playlist **/
+	function preview():Renderable
+		return (links.length == 0) ? nothing : html(<div class="preview">
+			${map(links, thumbnail)}
+			${playable ? html(<span data-icon="add">send adds to the playlist</span>) : nothing}
+		</div>);
 
 	/** Age of a message, e.g. `6m`, the date on hover **/
 	static function ago(date:Date) {
@@ -497,7 +530,7 @@ class Chat extends LitElement {
 					? ([html(<div class="action" data-items=${(g[0].items ?? []).join(" ")} style="--hue:${hue(g[0].nick)}" @click=${e -> {
 						tap(e, g[0]);
 						showItem(e, g[0]);
-					}}><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}</span>${reactButton(g[0])}${ago(g[0].time)}</div>), reactionBar(g[0])] : Renderable)
+					}}><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}${itemThumbs(g[0])}</span>${reactButton(g[0])}${ago(g[0].time)}</div>), reactionBar(g[0])] : Renderable)
 					: html(<div class=${g[0].nick == "*" ? "group notice" : g[0].nick == muc?.nick ? "group own" : "group"} style="--hue:${hue(g[0].nick)}">
 						<b class="nick">${g[0].nick}</b>
 						${map(g, m -> ([html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}${mediaLinks(m)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
@@ -506,6 +539,6 @@ class Chat extends LitElement {
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>
 			${people ? html(<div class="backdrop" @click=${() -> people = false}></div>) : nothing}
 			${settings && muc != null ? html(<rad-settings .muc=${muc} @close=${Settings.CLOSE.listen(() -> settings = false)}></rad-settings>) : nothing}
-			<form @submit=${submit}>${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
+			<form @submit=${submit}>${preview()}${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
 		</div>);
 }

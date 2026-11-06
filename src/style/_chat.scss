@@ -1,6 +1,7 @@
 @use 'pkg:enron/enron/a11y';
 @use 'pkg:enron/enron/break';
 @use 'pkg:enron/enron/layout';
+@use 'theme';
 
 // `> div >`: elements of the template only, not of the settings within
 rad-chat {
@@ -124,6 +125,11 @@ rad-chat {
 			white-space: pre-wrap;
 			overflow-wrap: anywhere;
 
+			// The text, the time beside it stays monospace
+			> span {
+				font: 1.08em/1.45 theme.$text;
+			}
+
 			// Mentions the own nick
 			&.mention {
 				background: color-mix(in srgb, var(--accent) 22%, var(--bg));
@@ -133,17 +139,12 @@ rad-chat {
 
 		// Media link posted within other text
 		.media {
+			font-family: theme.$font;
 			display: flex;
 			align-items: flex-end;
 			gap: .6rem;
 			margin: .3rem 0 .1rem;
 			white-space: normal;
-			img {
-				display: block;
-				width: 8rem;
-				aspect-ratio: 16 / 9;
-				object-fit: cover;
-			}
 			button {
 				padding: .1rem .5rem;
 				font-size: .85em;
@@ -159,7 +160,7 @@ rad-chat {
 
 		code,
 		pre {
-			font-family: ui-monospace, monospace;
+			font-family: theme.$font;
 			font-size: .9em;
 			background: var(--sunk);
 		}
@@ -203,6 +204,23 @@ rad-chat {
 			.nick {
 				font-size: 1em;
 			}
+			// Of the items it added
+			.thumbs {
+				display: flex;
+				flex-wrap: wrap;
+				gap: .4rem;
+				margin-top: .3rem;
+			}
+		}
+
+		// Sizes known before loading: no jump in the log
+		.media img,
+		.thumbs img {
+			display: block;
+			width: 8rem;
+			aspect-ratio: 16 / 9;
+			object-fit: cover;
+			background: var(--sunk);
 		}
 
 		// Shown on hover, touch devices tap the message instead
@@ -272,6 +290,7 @@ rad-chat {
 			border-color: var(--line);
 			.nick { color: var(--dim); }
 			p { background: var(--panel); }
+			p > span { font: inherit; } // aligned columns, e.g. /help
 		}
 	}
 
@@ -352,6 +371,30 @@ rad-chat {
 		border-top: 1px solid var(--line);
 		position: relative; // over the log, for the shadow and the typing line
 		box-shadow: 0 -4px 8px -4px var(--shadow);
+		flex-wrap: wrap;
+		row-gap: 0;
+
+		// Media links in the input, on a row above it
+		.preview {
+			flex-basis: 100%;
+			display: flex;
+			flex-wrap: wrap;
+			align-items: flex-end;
+			gap: .5rem;
+			font-size: .8em;
+			color: var(--dim);
+			img {
+				display: block;
+				width: 6rem;
+				aspect-ratio: 16 / 9;
+				object-fit: cover;
+				margin-bottom: .4rem;
+				background: var(--sunk);
+			}
+			span {
+				margin-bottom: .4rem;
+			}
+		}
 
 		// Over the bottom of the log, no layout shift
 		.typing {
@@ -375,7 +418,7 @@ rad-chat {
 			border: 0;
 			padding-left: 0;
 			resize: none;
-			line-height: inherit;
+			font: 1.08em/1.45 theme.$text;
 			&:focus-visible {
 				outline: none;
 			}

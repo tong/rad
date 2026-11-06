@@ -5,6 +5,7 @@ rad-login {
 	display: grid;
 	place-items: center;
 	min-height: 100%;
+	position: relative; // for the footer
 	padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
 }
 
@@ -41,4 +42,13 @@ rad-login form {
 	p {
 		margin: 0;
 	}
+}
+
+// The version, at the bottom of the page
+rad-login footer {
+	position: absolute;
+	bottom: max(.5rem, env(safe-area-inset-bottom));
+	left: max(1rem, env(safe-area-inset-left));
+	font-size: .75em;
+	color: var(--dim);
 }

@@ -9,6 +9,7 @@ rad-player {
 	min-height: 0;
 	border-right: 1px solid var(--line);
 	background: var(--panel); // set off from the chat
+	container-type: inline-size; // narrow: thumbnails only, see li
 
 	// Below the screen while playing: volume, skip
 	.bar {
@@ -114,6 +115,7 @@ rad-player {
 		// Beside the chat: the scrollbar on the left, away from the chat's own. Right-to-left puts it there, the items stay left-to-right
 		@include break.min(md) {
 			direction: rtl;
+			text-align: left; // the empty hint
 			> *,
 			&::before {
 				direction: ltr;
@@ -188,6 +190,19 @@ rad-player {
 		.muted {
 			display: block;
 			font-size: .85em;
+		}
+
+		// Narrow player: the thumbnail fills the width, the text is its tooltip. Items without one keep their text
+		@container (width < 16rem) {
+			.item:has(> img) {
+				> div {
+					display: none;
+				}
+				img {
+					flex: 1;
+					min-width: 0;
+				}
+			}
 		}
 	}
 

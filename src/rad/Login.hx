@@ -86,7 +86,7 @@ class Login extends LitElement {
 	}
 
 	override function render()
-		return html(<form @submit=${submit}>
+		return html(<div style="display:contents"><form @submit=${submit}>
 			${config.domain != null
 				? html(<label>user <input name="jid" placeholder=${'name @${config.domain}'} required autocomplete="username" .value=${value("jid")}></label>)
 				: html(<label>jid <input name="jid" type="email" placeholder="user@example.com" required autocomplete="username" .value=${value("jid")}></label>)}
@@ -98,7 +98,8 @@ class Login extends LitElement {
 			${config.websocket != null ? nothing : html(<label>websocket <input name="websocket" .value=${value("websocket")}></label>)}
 			<button data-icon="join" ?disabled=${busy}>${busy ? "connecting…" : "join"}</button>
 			${error != null ? html(<p class="error">${error}</p>) : nothing}
-		</form>);
+		</form>
+		<footer>v${Version.get()}</footer></div>);
 }
 
 @:native("Object") private extern class Object {

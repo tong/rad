@@ -1,5 +1,6 @@
 {
   "name": "rad",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "haxe build.hxml && sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css && esbuild build/rad.js --bundle --format=esm --outfile=web/rad.js",
