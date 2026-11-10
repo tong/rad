@@ -68,6 +68,22 @@ class Login extends LitElement {
 		window.removeEventListener("hashchange", onHash);
 	}
 
+	/**
+		Shared to rad from another app, e.g. into the installed PWA, which starts a new page: logs in with the password saved in the browser, no login form.
+		Chromium only (`PasswordCredential`), where share targets work. The browser may ask which account, else the form stays.
+	**/
+	override function firstUpdated(_) {
+		if (Chat.shared != null && js.Syntax.code("'PasswordCredential' in window"))
+			(js.Syntax.code("navigator.credentials.get({password: true, mediation: 'optional'})") : js.lib.Promise<Dynamic>).then(c -> {
+				final form:FormElement = cast querySelector("form");
+				if (c == null || c.password == null || form == null || busy)
+					return;
+				(cast form.elements.namedItem("jid") : js.html.InputElement).value = c.id;
+				(cast form.elements.namedItem("password") : js.html.InputElement).value = c.password;
+				(cast form).requestSubmit(); // missing in the extern, submits with the form checks and the submit event
+			}).catchError(_ -> {});
+	}
+
 	function submit(e:Event) {
 		e.preventDefault();
 		final f:Dynamic = Object.fromEntries(new js.html.FormData(cast(e.target, FormElement)).entries());

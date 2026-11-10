@@ -131,7 +131,7 @@ class Chat extends LitElement {
 		Shared to rad from another app (Web Share Target, see `manifest.json`): put into the input after joining, to send it.
 		Read once from the query of the start url, then removed from the address.
 	**/
-	static var shared:Null<String> = readShared();
+	public static var shared:Null<String> = readShared();
 
 	static function readShared():Null<String> {
 		final location = js.Browser.window.location;
