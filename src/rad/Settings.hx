@@ -31,7 +31,14 @@ class Settings extends LitElement {
 	static function set_theme(v:String) {
 		try js.Browser.window.localStorage.setItem("rad-theme", v) catch (_) {}
 		js.Browser.document.documentElement.dataset.theme = v;
+		themeColor();
 		return theme = v;
+	}
+
+	/** The browser bar in the color of the header, of the scheme in use. Also in `index.html` **/
+	static function themeColor() {
+		final root = js.Browser.document.documentElement;
+		js.Browser.document.querySelector("meta[name=theme-color]")?.setAttribute("content", js.Browser.window.getComputedStyle(root).getPropertyValue("--panel"));
 	}
 
 	@:property({attribute: false}) public var muc:Muc;
@@ -121,9 +128,9 @@ class Settings extends LitElement {
 				<button data-icon="close" title="close" aria-label="close" @click=${() -> CLOSE.dispatch(this)}></button>
 			</header>
 			${status != null ? html(<p class="status">${status}</p>) : nothing}
-			<label>theme <select @change=${(e:Event) -> theme = (cast e.target : js.html.SelectElement).value}>
+			${Login.config.scheme != null ? nothing : html(<label>theme <select @change=${(e:Event) -> theme = (cast e.target : js.html.SelectElement).value}>
 				${map([["", "system"], ["light", "light"], ["dark", "dark"]], o -> html(<option value=${o[0]} ?selected=${theme == o[0]}>${o[1]}</option>))}
-			</select></label>
+			</select></label>)}
 			<label class="check"><input type="checkbox" .checked=${Chat.shareTyping} @change=${(e:Event) -> Chat.shareTyping = (cast e.target : js.html.InputElement).checked}> show others when I'm typing</label>
 			<form @submit=${changeNick}>
 				<label>nick <input name="nick" maxlength="16" required .value=${muc.nick}></label>

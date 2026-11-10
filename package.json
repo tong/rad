@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "haxe build.hxml && sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css && esbuild build/rad.js --bundle --format=esm --outfile=web/rad.js",
-    "release": "haxe build.hxml && sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css --style=compressed && esbuild build/rad.js --bundle --format=esm --outfile=web/rad.js --minify",
-    "dev": "haxe build.hxml && (sass --pkg-importer=node --no-source-map src/rad.scss web/rad.css --watch & esbuild build/rad.js --bundle --format=esm --outfile=web/rad.js --watch=forever --servedir=web & watchexec -e hx,hxml -w src -w build.hxml haxe build.hxml)",
-    "deploy": "npm run release && . ./.env && rsync -avz web/ \"${DEPLOY_TARGET:?set DEPLOY_TARGET in .env}\""
+    "build": "haxe build.hxml -D rad-target=${RAD_TARGET:-example} && sass --pkg-importer=node --no-source-map targets/${RAD_TARGET:-example}/theme.scss web/rad.css && esbuild build/rad.js --bundle --format=esm --outfile=web/rad.js",
+    "dist": "sh dist.sh",
+    "dev": "haxe build.hxml -D rad-target=${RAD_TARGET:-example} && (sass --pkg-importer=node --no-source-map targets/${RAD_TARGET:-example}/theme.scss web/rad.css --watch & esbuild build/rad.js --bundle --format=esm --outfile=web/rad.js --watch=forever --servedir=web & watchexec -e hx,hxml,json -w src -w build.hxml -w targets haxe build.hxml -D rad-target=${RAD_TARGET:-example})",
+    "deploy": "sh dist.sh --deploy"
   },
   "devDependencies": {
     "enron": "github:tong/enron#v0.1.0",

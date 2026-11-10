@@ -3,3 +3,7 @@ build/
 web/*.js
 web/*.css
 .env
+dist/
+# local targets, except the example
+targets/*
+!targets/example/

@@ -374,12 +374,16 @@ class Chat extends LitElement {
 		e.preventDefault();
 	}
 
-	/** Consecutive messages of the same sender, at most 5 minutes apart **/
+	/** Joined or left: a line of its own. Shown locally, no id, unlike the playlist changes **/
+	static function presence(m:Message)
+		return m.action == true && m.id == null;
+
+	/** Consecutive messages of the same sender, its playlist changes too. Each shows its own time **/
 	static function groups(messages:Array<Message>):Array<Array<Message>> {
 		final groups:Array<Array<Message>> = [];
 		for (m in messages) {
 			final last = groups[groups.length - 1];
-			if (last != null && !m.action && !last[0].action && last[0].nick == m.nick && m.time.getTime() - last[last.length - 1].time.getTime() < 300000)
+			if (last != null && !presence(m) && !presence(last[0]) && last[0].nick == m.nick)
 				last.push(m);
 			else
 				groups.push([m]);
@@ -504,6 +508,18 @@ class Chat extends LitElement {
 	}
 
 	/** Stable color for a nick **/
+	/** Saves the playlist as an extended M3U file, playable in VLC and mpv **/
+	function exportPlaylist() {
+		final lines = ["#EXTM3U", '#PLAYLIST:$room'];
+		for (s in Player.schedule(items))
+			lines.push('#EXTINF:${Math.round(s.item.duration)},${(s.item.title ?? s.item.url).split("\n").join(" ")}\n${s.item.url}');
+		final a = js.Browser.document.createAnchorElement();
+		a.href = js.html.URL.createObjectURL(new js.html.Blob([lines.join("\n") + "\n"], {type: "audio/x-mpegurl"}));
+		a.download = '${room.split("@")[0]}-${DateTools.format(Date.now(), "%Y-%m-%d")}.m3u';
+		a.click();
+		js.Browser.window.setTimeout(() -> js.html.URL.revokeObjectURL(a.href), 1000); // after the download started
+	}
+
 	public static function hue(nick:String) {
 		var h = 0;
 		for (i in 0...nick.length)
@@ -520,20 +536,21 @@ class Chat extends LitElement {
 				</div>
 				${offline ? html(<span class="status">reconnecting…</span>) : nothing}
 				<button class="count" data-icon="users" title="users" @click=${() -> people = !people}>${occupants.length}</button>
+				<button data-icon="download" title="export playlist" aria-label="export playlist" ?disabled=${items.length == 0} @click=${exportPlaylist}></button>
 				<button data-icon="settings" title="settings" aria-label="settings" @click=${() -> settings = !settings}></button>
 				<button data-icon="leave" title="leave" aria-label="leave" @click=${() -> LOGOUT.dispatch(this)}></button>
 			</header>
 			<rad-player .items=${items} .offset=${offset}></rad-player>
 			<svg class="links" aria-hidden="true"></svg>
 			<div class="log">
-				${map(groups(messages), g -> g[0].action
-					? ([html(<div class="action" data-items=${(g[0].items ?? []).join(" ")} style="--hue:${hue(g[0].nick)}" @click=${e -> {
-						tap(e, g[0]);
-						showItem(e, g[0]);
-					}}><span><b class="nick">${g[0].nick}</b> ${linkify(g[0].body)}${itemThumbs(g[0])}</span>${reactButton(g[0])}${ago(g[0].time)}</div>), reactionBar(g[0])] : Renderable)
+				${map(groups(messages), g -> presence(g[0])
+					? html(<div class="action" style="--hue:${hue(g[0].nick)}"><span><b class="nick">${g[0].nick}</b> ${g[0].body}</span>${ago(g[0].time)}</div>)
 					: html(<div class=${g[0].nick == "*" ? "group notice" : g[0].nick == muc?.nick ? "group own" : "group"} style="--hue:${hue(g[0].nick)}">
 						<b class="nick">${g[0].nick}</b>
-						${map(g, m -> ([html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}${mediaLinks(m)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
+						${map(g, m -> ([m.action ? html(<div class="action playlist" data-items=${(m.items ?? []).join(" ")} @click=${e -> {
+							tap(e, m);
+							showItem(e, m);
+						}}><span>${linkify(m.body)}${itemThumbs(m)}</span>${reactButton(m)}${ago(m.time)}</div>) : html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}${mediaLinks(m)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
 					</div>))}
 			</div>
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>

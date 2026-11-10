@@ -1,13 +1,24 @@
 @use 'pkg:enron/enron/color';
 @use 'sass:color' as c;
+@use 'sass:map';
 
-$font: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+// Set by the theme of a target, see targets/<target>/theme.scss
+
+$font: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace !default;
 
 // What people write: the messages and the input, monospace stays for names, times and events
-$text: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+$text: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !default;
+
+// Colors of the schemes: background, text, accent and error. `$light: null`: dark only
+$dark: (bg: #0b0b0b, fg: #c6c6c6, accent: #a7b3bb, error: #ff5f5f) !default; // accent: cool gray
+$light: (bg: #f7f7f5, fg: #1f1f1f, accent: #4f5d68, error: #c62828) !default;
 
 // Colors of the scheme, from its background, text, accent and error color
-@mixin scheme($bg, $fg, $accent, $error, $dark) {
+@mixin scheme($colors, $dark) {
+	$bg: map.get($colors, bg);
+	$fg: map.get($colors, fg);
+	$accent: map.get($colors, accent);
+	$error: map.get($colors, error);
 	--bg: #{$bg};
 	--fg: #{$fg};
 	--accent: #{$accent};
@@ -37,14 +48,16 @@ $text: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 :root {
-	@include scheme(#0b0b0b, #c6c6c6, #a7b3bb, #ff5f5f, true); // accent: cool gray
-	@media (prefers-color-scheme: light) {
-		&:not([data-theme=dark]) {
-			@include scheme(#f7f7f5, #1f1f1f, #4f5d68, #c62828, false);
+	@include scheme($dark, true);
+	@if $light {
+		@media (prefers-color-scheme: light) {
+			&:not([data-theme=dark]) {
+				@include scheme($light, false);
+			}
 		}
-	}
-	// Chosen in the settings, else the system preference
-	&[data-theme=light] {
-		@include scheme(#f7f7f5, #1f1f1f, #4f5d68, #c62828, false);
+		// Chosen in the settings, else the system preference
+		&[data-theme=light] {
+			@include scheme($light, false);
+		}
 	}
 }

@@ -1,0 +1,9 @@
+{
+	"domain": "example.com",
+	"websocket": "wss://example.com/xmpp-websocket",
+	"room": "lobby@conference.example.com",
+	"conference": "conference.example.com",
+	"defaultRoom": "lobby@conference.example.com",
+	"nickField": true,
+	"scheme": "dark"
+}

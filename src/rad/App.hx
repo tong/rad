@@ -33,12 +33,6 @@ class App extends LitElement {
 
 	static function main() {}
 
-	// Site configuration, see `Login.Config`
-	@:property public var domain:Null<String>;
-	@:property public var websocket:Null<String>;
-	@:property public var room:Null<String>;
-	@:property public var conference:Null<String>;
-
 	@:state var busy = false;
 	@:state var error:Null<String>;
 	@:state var muc:Null<Muc>;
@@ -492,7 +486,7 @@ class App extends LitElement {
 
 	override function render()
 		return if (muc == null)
-			html(<rad-login ?busy=${busy} .error=${error} .config=${{domain: domain, websocket: websocket, room: room, conference: conference}} @login=${Login.LOGIN.listen(login)}></rad-login>);
+			html(<rad-login ?busy=${busy} .error=${error} @login=${Login.LOGIN.listen(login)}></rad-login>);
 		else
 			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc} .typing=${typing} .reactions=${reactions}
 				@send=${Chat.SEND.listen(send)} @react=${Chat.REACT.listen(react)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)}></rad-chat>);

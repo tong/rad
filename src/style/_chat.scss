@@ -189,7 +189,7 @@ rad-chat {
 			color: var(--dim);
 		}
 
-		// Playlist change: a line, no bubble. Click shows its item in the playlist
+		// An event: joined or left, a line of its own. Playlist changes: click shows the item in the playlist
 		.action {
 			display: flex;
 			align-items: baseline;
@@ -203,6 +203,15 @@ rad-chat {
 			}
 			.nick {
 				font-size: 1em;
+			}
+			// Added or skipped, in the sender's group: a bubble in their color, the text dimmed
+			&.playlist {
+				max-width: 100%;
+				padding: .3rem .7rem;
+				background: hsl(var(--hue) var(--bubble-sl));
+				&.linked {
+					background: color-mix(in srgb, var(--accent) 18%, hsl(var(--hue) var(--bubble-sl)));
+				}
 			}
 			// Of the items it added
 			.thumbs {
@@ -277,11 +286,6 @@ rad-chat {
 			.pick {
 				border-style: dashed;
 			}
-		}
-
-		// Under an action line
-		> .reactions {
-			padding-left: calc(.6rem + 2px);
 		}
 
 		.notice {
@@ -364,10 +368,8 @@ rad-chat {
 	> div > form {
 		grid-area: 3 / 2;
 		display: flex;
-		align-items: flex-end; // send button stays at the bottom of a multiline input
 		gap: .5rem;
-		padding: .4rem 1rem;
-		padding-bottom: max(.4rem, env(safe-area-inset-bottom));
+		padding: 0 0 env(safe-area-inset-bottom) 1rem; // the send button fills the input height
 		border-top: 1px solid var(--line);
 		position: relative; // over the log, for the shadow and the typing line
 		box-shadow: 0 -4px 8px -4px var(--shadow);
@@ -381,6 +383,7 @@ rad-chat {
 			flex-wrap: wrap;
 			align-items: flex-end;
 			gap: .5rem;
+			padding: .4rem 1rem 0 0;
 			font-size: .8em;
 			color: var(--dim);
 			img {
@@ -416,7 +419,7 @@ rad-chat {
 			field-sizing: content;
 			max-height: 10lh;
 			border: 0;
-			padding-left: 0;
+			padding: .7rem 0;
 			resize: none;
 			font: 1.08em/1.45 theme.$text;
 			&:focus-visible {
@@ -428,6 +431,10 @@ rad-chat {
 					animation: pulse 1.6s ease-in-out infinite;
 				}
 			}
+		}
+
+		> button {
+			padding-inline: 1.1rem;
 		}
 	}
 

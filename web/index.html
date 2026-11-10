@@ -9,8 +9,7 @@
     <meta name="description" content="This is RAD">
 	<meta name="application-name" content="rad">
 	<meta name="color-scheme" content="dark light">
-	<meta name="theme-color" content="#0b0b0b" media="(prefers-color-scheme: dark)">
-	<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+	<meta name="theme-color" content="#0b0b0b">
 	<meta name="referrer" content="strict-origin-when-cross-origin">
 	<meta property="og:type" content="website">
 	<meta property="og:title" content="rad">
@@ -23,19 +22,17 @@
 	<meta name="apple-mobile-web-app-title" content="rad">
 	<link rel="stylesheet" href="rad.css">
 	
-	<script>try { document.documentElement.dataset.theme = localStorage.getItem("rad-theme") || "" } catch (e) {} // before the first paint, see Settings.theme</script>
+	<script>
+		// Before the first paint, see Settings.theme. The browser bar in the color of the header, the theme of the target sets it
+		try { document.documentElement.dataset.theme = localStorage.getItem("rad-theme") || "" } catch (e) {}
+		const themeColor = () => document.querySelector("meta[name=theme-color]").content = getComputedStyle(document.documentElement).getPropertyValue("--panel");
+		themeColor();
+		matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themeColor);
+	</script>
     <script type="module" src="rad.js" async></script>
 </head>
 <body>
-	<!--
-		Configuration, all optional. A set value is used as is and its login field is hidden.
-		  domain      XMPP domain, users only enter their name
-		  websocket   WebSocket endpoint (default: wss://<domain>/xmpp-websocket)
-		  room        Room to join
-		  conference  MUC service, users only enter the room name
-		Example:
-		  <rad-app domain="example.com" websocket="wss://xmpp.example.com/xmpp-websocket" room="lobby@conference.example.com"></rad-app>
-	-->
+	<!-- Configured by the build target, see targets/ -->
 	<rad-app></rad-app>
 	<noscript>rad needs javascript</noscript>
 </body>

@@ -1,0 +1,12 @@
+// The stylesheet of the target: configures the theme, then adds rules of its own. E.g.
+//
+//   @use '../../src/style/theme' with (
+//   	$font: monospace,                                        // names, times, events
+//   	$text: system-ui, sans-serif,                            // messages and the input
+//   	$dark: (bg: #000, fg: #eee, accent: #f0f, error: #f00),
+//   	$light: null                                             // dark only, set "scheme": "dark" in config.json
+//   );
+//
+//   body { font-size: 14px; }
+
+@use '../../src/rad';
