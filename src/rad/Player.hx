@@ -36,6 +36,9 @@ typedef Slot = {item:Track, start:Float, end:Float}
 **/
 @:customElement("rad-player")
 class Player extends LitElement {
+	/** The playing item changed, null when nothing plays **/
+	public static final PLAYING = new lit.EventType<Null<Track>>("playing");
+
 	@:property({attribute: false}) public var items:Array<Track> = [];
 
 	/** Server time minus local time in ms **/
@@ -138,6 +141,7 @@ class Player extends LitElement {
 			media?.destroy();
 			media = null;
 			current = playing?.item;
+			PLAYING.dispatch(this, current);
 			final source = (current == null) ? null : Media.parse(current.url);
 			if (source != null) // else unknown to this version
 				media = Media.create(source, screen, () -> (Date.now().getTime() + offset - playing.start) / 1000);
@@ -204,7 +208,7 @@ class Player extends LitElement {
 
 	/** An item, `action`: a button at the end **/
 	function item(t:Track, ?action:lit.Renderable)
-		return html(<div class="item" data-item=${t.id}>
+		return html(<div class="item" data-item=${t.id} style="--hue:${Chat.hue(t.nick)}">
 			${t.thumb != null ? html(<img src=${t.thumb} alt="" title=${t.title ?? t.url} loading="lazy" referrerpolicy="no-referrer"/>) : nothing}
 			<div>
 				<a href=${t.url} target="_blank" data-icon=${icon(t.url)}>${t.title ?? t.url}</a>

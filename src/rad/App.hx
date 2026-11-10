@@ -37,6 +37,9 @@ class App extends LitElement {
 	@:state var error:Null<String>;
 	@:state var muc:Null<Muc>;
 	@:state var subject = "";
+
+	/** Title of the playing item, in the page title **/
+	@:state var playing:Null<String>;
 	@:state var messages:Array<Message> = [];
 	@:state var occupants:Array<String> = [];
 	@:state var items:Array<Track> = [];
@@ -104,7 +107,7 @@ class App extends LitElement {
 	}
 
 	override function updated(changed:lit.PropertyValues)
-		document.title = (muc == null) ? "rad" : '${unread > 0 ? '($unread) ' : ""}${muc.room} · ${occupants.length}';
+		document.title = (muc == null) ? "rad" : '${unread > 0 ? '($unread) ' : ""}${muc.room} · ${occupants.length}${playing != null ? ' · $playing' : ""}';
 
 	function login(a:Account) {
 		busy = true;
@@ -453,7 +456,7 @@ class App extends LitElement {
 	**/
 	function rememberLogin(room:String) {
 		final form = querySelector("rad-login form");
-		if (form != null && js.Syntax.code("'PasswordCredential' in window"))
+		if (form != null && js.Syntax.code("('PasswordCredential' in window)"))
 			try js.Syntax.code("navigator.credentials.store(new PasswordCredential({0})).catch(() => {})", form) catch (_) {} // Chromium
 		window.history.replaceState(null, "", '#$room'); // same document navigation counts as success too (Firefox)
 	}
@@ -481,6 +484,7 @@ class App extends LitElement {
 		occupants = [];
 		items = [];
 		subject = "";
+		playing = null;
 		unread = 0;
 	}
 
@@ -489,5 +493,5 @@ class App extends LitElement {
 			html(<rad-login ?busy=${busy} .error=${error} @login=${Login.LOGIN.listen(login)}></rad-login>);
 		else
 			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc} .typing=${typing} .reactions=${reactions}
-				@send=${Chat.SEND.listen(send)} @react=${Chat.REACT.listen(react)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)}></rad-chat>);
+				@send=${Chat.SEND.listen(send)} @react=${Chat.REACT.listen(react)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)} @playing=${Player.PLAYING.listen(t -> playing = (t == null) ? null : t.title ?? t.url)}></rad-chat>);
 }
