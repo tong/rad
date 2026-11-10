@@ -365,6 +365,33 @@ rad-chat {
 		background: rgb(0 0 0 / .5);
 	}
 
+	// Wide window: the user list is a column of its own, always shown. The user count is just a number
+	@include break.min(lg) {
+		grid-template-columns: var(--player-width, minmax(0, 3fr)) minmax(0, 2fr) auto;
+		&:has(.screen:empty) {
+			grid-template-columns: var(--player-width, 20rem) minmax(0, 1fr) auto;
+		}
+
+		> div > ul {
+			grid-area: 2 / 3 / 4;
+			position: static;
+			z-index: auto;
+			max-width: 12rem;
+			padding-top: .5rem;
+			transform: none;
+			visibility: visible;
+			transition: none;
+		}
+
+		.backdrop {
+			display: none;
+		}
+
+		> div > header .count {
+			pointer-events: none;
+		}
+	}
+
 	> div > form {
 		grid-area: 3 / 2;
 		display: flex;
