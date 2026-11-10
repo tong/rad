@@ -79,6 +79,12 @@ class Chat extends LitElement {
 	/** Media links in the input, previewed above it **/
 	@:state var links:Array<String> = [];
 
+	/** The playing item, its chat line pulses like it and shows the position **/
+	@:state var playing:Null<Slot>;
+
+	/** Nothing to send, the send button is disabled **/
+	@:state var empty = true;
+
 	/** The input holds only media links: sent, they are added to the playlist **/
 	@:state var playable = false;
 
@@ -293,6 +299,7 @@ class Chat extends LitElement {
 		if (l.join(" ") != links.join(" "))
 			links = l;
 		playable = onlyMedia(input.value);
+		empty = StringTools.trim(input.value) == "";
 	}
 
 	function setComposing(v:Bool)
@@ -439,14 +446,28 @@ class Chat extends LitElement {
 				}
 		];
 
-	/** Thumbnails of media links in messages, by url, looked up once **/
-	static final thumbs = new Map<String, js.lib.Promise<Null<String>>>();
+	/** What is known about media links, by url, looked up once **/
+	static final infos = new Map<String, js.lib.Promise<Media.Info>>();
+
+	static function info(url:String) {
+		if (!infos.exists(url))
+			infos[url] = Media.info(Media.parse(url)).catchError(_ -> ({} : Media.Info));
+		return infos[url];
+	}
+
+	static function thumbImage(i:Media.Info):Renderable
+		return (i.thumb != null && StringTools.startsWith(i.thumb, "https://")) ? html(<img src=${i.thumb} alt="" referrerpolicy="no-referrer"/>) : nothing;
 
 	/** The thumbnail of a media link once looked up, nothing if it has none **/
-	static function thumbnail(url:String) {
-		if (!thumbs.exists(url))
-			thumbs[url] = Media.thumbnail(Media.parse(url)).catchError(_ -> null);
-		return until(thumbs[url].then(t -> (t != null && StringTools.startsWith(t, "https://")) ? html(<img src=${t} alt="" referrerpolicy="no-referrer"/>) : nothing), nothing);
+	static function thumbnail(url:String)
+		return until(info(url).then(thumbImage), nothing);
+
+	/** A media link in the input: thumbnail, title, artist, length, date and tags once looked up, `i` is null while looking up **/
+	static function card(url:String, ?i:Media.Info):Renderable {
+		if (i == null)
+			return html(<div class="card loading"><span class="thumb"></span><div><b>${url}</b><span>loading…</span></div></div>);
+		final meta = [i.author, i.duration != null ? Player.format(i.duration) : null, i.date, i.tags?.join(", ")].filter(s -> s != null && s != "");
+		return html(<div class="card">${thumbImage(i)}<div><b>${i.title ?? url}</b>${meta.length > 0 ? html(<span>${meta.join(" · ")}</span>) : nothing}</div></div>);
 	}
 
 	/** Media links in `text`, each once **/
@@ -469,16 +490,20 @@ class Chat extends LitElement {
 				html(<span class="media"><a href=${url} target="_blank">${thumbnail(url)}</a><button data-icon="add" title="add to the playlist" @click=${() -> SEND.dispatch(this, url)}>play</button></span>)
 		];
 
+	/** Added the playing item **/
+	function isPlaying(m:Message)
+		return playing != null && m.items?.contains(playing.item.id) == true;
+
 	/** Thumbnails of the playlist items a message added **/
 	function itemThumbs(m:Message):Renderable {
 		final urls = [for (id in m.items ?? []) Lambda.find(items, i -> i.id == id)?.thumb].filter(t -> t != null);
 		return (urls.length == 0) ? nothing : html(<span class="thumbs">${map(urls, t -> html(<img src=${t} alt="" loading="lazy" referrerpolicy="no-referrer"/>))}</span>);
 	}
 
-	/** Media links in the input: their thumbnails, sent alone they are added to the playlist **/
+	/** Media links in the input: what is known about them, sent alone they are added to the playlist **/
 	function preview():Renderable
 		return (links.length == 0) ? nothing : html(<div class="preview">
-			${map(links, thumbnail)}
+			${map(links, url -> until(info(url).then(i -> card(url, i)), card(url)))}
 			${playable ? html(<span data-icon="add">send adds to the playlist</span>) : nothing}
 		</div>);
 
@@ -511,7 +536,7 @@ class Chat extends LitElement {
 	/** Saves the playlist as an extended M3U file, playable in VLC and mpv **/
 	function exportPlaylist() {
 		final lines = ["#EXTM3U", '#PLAYLIST:$room'];
-		for (s in Player.schedule(items))
+		for (s in Player.playlist(items))
 			lines.push('#EXTINF:${Math.round(s.item.duration)},${(s.item.title ?? s.item.url).split("\n").join(" ")}\n${s.item.url}');
 		final a = js.Browser.document.createAnchorElement();
 		a.href = js.html.URL.createObjectURL(new js.html.Blob([lines.join("\n") + "\n"], {type: "audio/x-mpegurl"}));
@@ -540,22 +565,22 @@ class Chat extends LitElement {
 				<button data-icon="settings" title="settings" aria-label="settings" @click=${() -> settings = !settings}></button>
 				<button data-icon="leave" title="leave" aria-label="leave" @click=${() -> LOGOUT.dispatch(this)}></button>
 			</header>
-			<rad-player .items=${items} .offset=${offset}></rad-player>
+			<rad-player .items=${items} .offset=${offset} @playing=${Player.PLAYING.listen(s -> playing = s)}></rad-player>
 			<svg class="links" aria-hidden="true"></svg>
 			<div class="log">
 				${map(groups(messages), g -> presence(g[0])
 					? html(<div class="action" style="--hue:${hue(g[0].nick)}"><span><b class="nick">${g[0].nick}</b> ${g[0].body}</span>${ago(g[0].time)}</div>)
 					: html(<div class=${g[0].nick == "*" ? "group notice" : g[0].nick == muc?.nick ? "group own" : "group"} style="--hue:${hue(g[0].nick)}">
 						<b class="nick">${g[0].nick}</b>
-						${map(g, m -> ([m.action ? html(<div class="action playlist" data-items=${(m.items ?? []).join(" ")} @click=${e -> {
+						${map(g, m -> ([m.action ? html(<div class=${isPlaying(m) ? "action playlist playing" : "action playlist"} data-items=${(m.items ?? []).join(" ")} @click=${e -> {
 							tap(e, m);
 							showItem(e, m);
-						}}><span>${linkify(m.body)}${itemThumbs(m)}</span>${reactButton(m)}${ago(m.time)}</div>) : html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}${mediaLinks(m)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
+						}}><span>${linkify(m.body)}${itemThumbs(m)}</span>${isPlaying(m) ? html(<rad-position start=${playing.start} duration=${playing.item.duration} offset=${offset}></rad-position>) : nothing}${reactButton(m)}${ago(m.time)}</div>) : html(<p class=${mentionsMe(m) ? "mention" : ""} @click=${e -> tap(e, m)}><span>${styled(m.body)}${mediaLinks(m)}</span>${reactButton(m)}${ago(m.time)}</p>), reactionBar(m)] : Array<Renderable>))}
 					</div>))}
 			</div>
 			<ul class=${people ? "open" : ""}>${map(sorted(occupants), n -> html(<li class=${n == muc?.nick ? "nick me" : "nick"} style="--hue:${hue(n)}">${n}</li>))}</ul>
 			${people ? html(<div class="backdrop" @click=${() -> people = false}></div>) : nothing}
 			${settings && muc != null ? html(<rad-settings .muc=${muc} @close=${Settings.CLOSE.listen(() -> settings = false)}></rad-settings>) : nothing}
-			<form @submit=${submit}>${preview()}${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy}></button></form>
+			<form @submit=${submit}>${preview()}${typing.length > 0 ? html(<span class="typing">${typingText(typing)}</span>) : nothing}<textarea rows="1" ?disabled=${busy} placeholder=${busy ? "loading media…" : "..."} @keydown=${onKey} @input=${onInput}></textarea><button data-icon="send" title="send" aria-label="send" ?disabled=${busy || empty}></button></form>
 		</div>);
 }

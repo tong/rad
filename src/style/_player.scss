@@ -137,6 +137,10 @@ rad-player {
 			a {
 				color: var(--fg);
 			}
+			// Playing: its background breathes, slowly towards the accent and back. A color change, no motion
+			.item {
+				animation: playing 2s ease-in-out infinite alternate;
+			}
 		}
 
 		&.played {
@@ -193,6 +197,11 @@ rad-player {
 		.muted {
 			display: block;
 			font-size: .85em;
+		}
+
+		.position {
+			color: var(--fg);
+			font-variant-numeric: tabular-nums;
 		}
 
 		// Narrow player: the thumbnail fills the width, the text is its tooltip. Items without one keep their text
@@ -264,4 +273,9 @@ rad-player {
 			}
 		}
 	}
+}
+
+// From the item's own background, also when linked, see Chat.drawLinks. Also the chat line that added the playing item
+@keyframes playing {
+	to { background: color-mix(in srgb, var(--accent) 30%, hsl(var(--hue) var(--bubble-sl))); }
 }

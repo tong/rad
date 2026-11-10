@@ -23,7 +23,10 @@ typedef Track = {
 	time:Float,
 
 	/** When it was removed, server time in ms **/
-	?removed:Float
+	?removed:Float,
+
+	/** Removed again after it was skipped: not listed **/
+	?hidden:Bool
 }
 
 typedef Slot = {item:Track, start:Float, end:Float}
@@ -37,7 +40,7 @@ typedef Slot = {item:Track, start:Float, end:Float}
 @:customElement("rad-player")
 class Player extends LitElement {
 	/** The playing item changed, null when nothing plays **/
-	public static final PLAYING = new lit.EventType<Null<Track>>("playing");
+	public static final PLAYING = new lit.EventType<Null<Slot>>("playing");
 
 	@:property({attribute: false}) public var items:Array<Track> = [];
 
@@ -133,6 +136,13 @@ class Player extends LitElement {
 		return slots;
 	}
 
+	/**
+		The items shown: `schedule` without the played items removed afterwards.
+		They stay in the schedule, as dropping them would move the start of the later items.
+	**/
+	public static function playlist(items:Array<Track>):Array<Slot>
+		return schedule(items).filter(s -> s.item.hidden != true && (s.item.removed == null || s.item.removed < s.start + s.item.duration * 1000));
+
 	function tick() {
 		final now = Date.now().getTime() + offset;
 		final playing = Lambda.find(schedule(items), s -> now >= s.start && now < s.end);
@@ -141,7 +151,7 @@ class Player extends LitElement {
 			media?.destroy();
 			media = null;
 			current = playing?.item;
-			PLAYING.dispatch(this, current);
+			PLAYING.dispatch(this, playing);
 			final source = (current == null) ? null : Media.parse(current.url);
 			if (source != null) // else unknown to this version
 				media = Media.create(source, screen, () -> (Date.now().getTime() + offset - playing.start) / 1000);
@@ -175,7 +185,7 @@ class Player extends LitElement {
 			case null: "music";
 		}
 
-	static function format(seconds:Float)
+	public static function format(seconds:Float)
 		return '${Std.int(seconds / 60)}:${StringTools.lpad(Std.string(Std.int(seconds % 60)), "0", 2)}';
 
 	override function render()
@@ -189,16 +199,19 @@ class Player extends LitElement {
 				<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>
 			</div>)}
 			<div class="split" @pointerdown=${drag}></div>
-			<ol>${map(schedule(items), s -> played(s) ? html(<li class="played">${item(s.item, html(<button data-icon="add" title="play again" aria-label="play again" @click=${() -> Chat.SEND.dispatch(this, s.item.url)}></button>))}</li>) : s.item == current ? html(<li class="current">${item(s.item, html(<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>))}</li>) : html(<li>${item(s.item, html(<button data-icon="close" title="remove" aria-label="remove" @click=${() -> removeItem(s.item)}></button>))}</li>))}</ol>
+			<ol>${map(playlist(items), s -> played(s) ? html(<li class="played">${item(s.item, ([
+				html(<button data-icon="add" title="play again" aria-label="play again" @click=${() -> Chat.SEND.dispatch(this, s.item.url)}></button>),
+				html(<button data-icon="close" title="remove" aria-label="remove" @click=${() -> removeItem(s.item)}></button>)
+			] : Array<lit.Renderable>))}</li>) : s.item == current ? html(<li class="current">${item(s.item, html(<button data-icon="skip" title="skip" aria-label="skip" @click=${() -> Chat.SEND.dispatch(this, "/skip")}></button>))}</li>) : html(<li>${item(s.item, html(<button data-icon="close" title="remove" aria-label="remove" @click=${() -> removeItem(s.item)}></button>))}</li>))}</ol>
 		</div>);
 
 	/** Position in the current item in seconds, the time all clients sync to **/
 	function elapsed()
 		return Math.max(0, Math.min((Date.now().getTime() + offset - start) / 1000, current.duration));
 
-	/** Removes an upcoming item: `/remove` with its number at the time of the click **/
+	/** Removes an upcoming or played item: `/remove` with its number at the time of the click **/
 	function removeItem(t:Track) {
-		final i = Lambda.findIndex(schedule(items), s -> s.item.id == t.id);
+		final i = Lambda.findIndex(playlist(items), s -> s.item.id == t.id);
 		if (i >= 0)
 			Chat.SEND.dispatch(this, '/remove ${i + 1}');
 	}
@@ -212,8 +225,42 @@ class Player extends LitElement {
 			${t.thumb != null ? html(<img src=${t.thumb} alt="" title=${t.title ?? t.url} loading="lazy" referrerpolicy="no-referrer"/>) : nothing}
 			<div>
 				<a href=${t.url} target="_blank" data-icon=${icon(t.url)}>${t.title ?? t.url}</a>
-				<span class="muted">${format(t.duration)} · <span class="nick" style="--hue:${Chat.hue(t.nick)}">${t.nick}</span> · ${DateTools.format(Date.fromTime(t.time - offset), "%Y-%m-%d %H:%M")}</span>
+				<span class="muted">${t == current ? html(<span class="position">${format(elapsed())} / ${format(t.duration)}</span>) : format(t.duration)} · <span class="nick" style="--hue:${Chat.hue(t.nick)}">${t.nick}</span> · ${DateTools.format(Date.fromTime(t.time - offset), "%Y-%m-%d %H:%M")}</span>
 			</div>
 			${action ?? nothing}
 		</div>);
+}
+
+/**
+	Position in the playing item, e.g. `1:23 / 4:56`, updated every second by itself.
+	For the chat line that added the item, the chat doesn't render every second.
+**/
+@:customElement("rad-position")
+class Position extends LitElement {
+	/** Start of the item, server time in ms **/
+	@:property({type: Number}) public var start = 0.0;
+
+	/** Length in seconds **/
+	@:property({type: Number}) public var duration = 0.0;
+
+	/** Server time minus local time in ms **/
+	@:property({type: Number}) public var offset = 0.0;
+
+	var timer = 0;
+
+	override function createRenderRoot()
+		return cast this;
+
+	override function connectedCallback() {
+		super.connectedCallback();
+		timer = window.setInterval(requestUpdate, 1000);
+	}
+
+	override function disconnectedCallback() {
+		super.disconnectedCallback();
+		window.clearInterval(timer);
+	}
+
+	override function render()
+		return html(<span>${Player.format(Math.max(0, Math.min((Date.now().getTime() + offset - start) / 1000, duration)))} / ${Player.format(duration)}</span>);
 }

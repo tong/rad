@@ -299,7 +299,8 @@ class App extends LitElement {
 								nick: i.nick,
 								duration: i.duration,
 								time: i.time,
-								removed: Math.min(i.removed ?? time, time)
+								removed: Math.min(i.removed ?? time, time),
+								hidden: i.hidden == true || (i.removed != null && time > i.removed) // a skipped item removed from the list
 							} : i];
 					}
 		}
@@ -376,11 +377,9 @@ class App extends LitElement {
 					return notice("Nothing is playing");
 				say('skipped “${slot.item.title ?? slot.item.url}”', [removal(slot.item, now)]);
 			case "/remove":
-				final slot = slots[Std.parseInt(args[1] ?? "") - 1];
+				final slot = Player.playlist(items)[Std.parseInt(args[1] ?? "") - 1];
 				if (slot == null)
 					return notice("Usage: /remove <number of the playlist item>");
-				if (slot.end <= now)
-					return notice("Already played");
 				say('removed “${slot.item.title ?? slot.item.url}”', [removal(slot.item, now)]);
 			case _:
 				say(body);
@@ -493,5 +492,5 @@ class App extends LitElement {
 			html(<rad-login ?busy=${busy} .error=${error} @login=${Login.LOGIN.listen(login)}></rad-login>);
 		else
 			html(<rad-chat room=${'${muc.room}@${muc.host}'} subject=${subject} .messages=${messages} .occupants=${occupants} .items=${items} .offset=${offset} ?offline=${offline} ?busy=${probing} .muc=${muc} .typing=${typing} .reactions=${reactions}
-				@send=${Chat.SEND.listen(send)} @react=${Chat.REACT.listen(react)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)} @playing=${Player.PLAYING.listen(t -> playing = (t == null) ? null : t.title ?? t.url)}></rad-chat>);
+				@send=${Chat.SEND.listen(send)} @react=${Chat.REACT.listen(react)} @typing=${Chat.TYPING.listen(sendTyping)} @logout=${Chat.LOGOUT.listen(logout)} @playing=${Player.PLAYING.listen(s -> playing = (s == null) ? null : s.item.title ?? s.item.url)}></rad-chat>);
 }

@@ -189,6 +189,14 @@ rad-chat {
 			color: var(--dim);
 		}
 
+		// In the chat line that added the playing item
+		rad-position {
+			flex: none;
+			font-size: .75em;
+			font-variant-numeric: tabular-nums;
+			color: var(--fg);
+		}
+
 		// An event: joined or left, a line of its own. Playlist changes: click shows the item in the playlist
 		.action {
 			display: flex;
@@ -211,6 +219,10 @@ rad-chat {
 				background: hsl(var(--hue) var(--bubble-sl));
 				&.linked {
 					background: color-mix(in srgb, var(--accent) 18%, hsl(var(--hue) var(--bubble-sl)));
+				}
+				// Added the playing item: pulses like it, see the player
+				&.playing {
+					animation: playing 2s ease-in-out infinite alternate;
 				}
 			}
 			// Of the items it added
@@ -403,26 +415,48 @@ rad-chat {
 		flex-wrap: wrap;
 		row-gap: 0;
 
-		// Media links in the input, on a row above it
+		// Media links in the input, above it: one per line, then what sending does
 		.preview {
 			flex-basis: 100%;
 			display: flex;
-			flex-wrap: wrap;
-			align-items: flex-end;
-			gap: .5rem;
-			padding: .4rem 1rem 0 0;
+			flex-direction: column;
+			gap: .4rem;
+			padding: .4rem 1rem .4rem 0;
 			font-size: .8em;
 			color: var(--dim);
-			img {
+			.card {
+				display: flex;
+				align-items: center;
+				gap: .6rem;
+				min-width: 0;
+				> div {
+					min-width: 0;
+					display: flex;
+					flex-direction: column;
+				}
+				b {
+					font-weight: normal;
+					color: var(--fg);
+					@include layout.no-text-overflow;
+				}
+				span {
+					@include layout.no-text-overflow;
+				}
+			}
+			img,
+			.thumb {
+				flex: none;
 				display: block;
 				width: 6rem;
 				aspect-ratio: 16 / 9;
 				object-fit: cover;
-				margin-bottom: .4rem;
 				background: var(--sunk);
 			}
-			span {
-				margin-bottom: .4rem;
+			// Still looking up: an empty thumbnail, pulsing
+			.loading {
+				@include a11y.motion {
+					animation: pulse 1.6s ease-in-out infinite;
+				}
 			}
 		}
 

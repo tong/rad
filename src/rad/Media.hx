@@ -6,6 +6,25 @@ import js.Syntax.code;
 import js.html.Element;
 import js.lib.Promise;
 
+/** What is known about a media link before it is played, from the oEmbed and APIs of the sites **/
+typedef Info = {
+	/** Url of a thumbnail image **/
+	?thumb:String,
+
+	?title:String,
+
+	/** Artist, uploader **/
+	?author:String,
+
+	/** Length in seconds **/
+	?duration:Float,
+
+	/** Upload date, `YYYY-MM-DD` **/
+	?date:String,
+
+	?tags:Array<String>
+}
+
 enum Source {
 	File(url:String);
 	YouTube(id:String);
@@ -78,15 +97,45 @@ abstract class Media {
 	}
 
 	/** Url of a thumbnail image of `source`, `null` if none **/
-	public static function thumbnail(source:Source):Promise<Null<String>> {
+	public static function thumbnail(source:Source):Promise<Null<String>>
+		return info(source).then(i -> i.thumb);
+
+	/** Looks up what is known about `source`, without loading a player. Fields are missing where the site doesn't tell **/
+	public static function info(source:Source):Promise<Info> {
 		function json(url:String):Promise<Dynamic>
-			return window.fetch(url).then(r -> r.json());
+			return window.fetch(url).then(r -> r.ok ? r.json() : Promise.reject(r.status));
+		function oembed(url:String):Promise<Info>
+			return json(url).then(j -> ({thumb: j.thumbnail_url, title: j.title, author: j.author_name, duration: j.duration, date: (j.upload_date : String)?.substr(0, 10)} : Info));
 		return switch source {
-			case YouTube(id): Promise.resolve('https://i.ytimg.com/vi/$id/mqdefault.jpg');
-			case Vimeo(url): json('https://vimeo.com/api/oembed.json?width=320&url=${StringTools.urlEncode(url)}').then(j -> j.thumbnail_url);
-			case SoundCloud(url): json('https://soundcloud.com/oembed?format=json&url=${StringTools.urlEncode(url)}').then(j -> j.thumbnail_url);
-			case Mixcloud(path): json('https://api.mixcloud.com$path').then(j -> j.pictures?.medium);
-			case File(_): Promise.resolve(null);
+			case YouTube(id):
+				final thumb = 'https://i.ytimg.com/vi/$id/mqdefault.jpg';
+				oembed('https://www.youtube.com/oembed?format=json&url=${StringTools.urlEncode('https://www.youtube.com/watch?v=$id')}')
+					.then(i -> ({thumb: thumb, title: i.title, author: i.author} : Info), _ -> ({thumb: thumb} : Info));
+			case Vimeo(url): oembed('https://vimeo.com/api/oembed.json?width=320&url=${StringTools.urlEncode(url)}');
+			case SoundCloud(url): oembed('https://soundcloud.com/oembed?format=json&url=${StringTools.urlEncode(url)}');
+			case Mixcloud(path): json('https://api.mixcloud.com$path').then(j -> ({
+					thumb: j.pictures?.medium,
+					title: j.name,
+					author: j.user?.name,
+					duration: j.audio_length,
+					date: (j.created_time : String)?.substr(0, 10),
+					tags: (j.tags : Array<Dynamic>)?.map(t -> (t.name : String))
+				} : Info));
+			case File(url):
+				// The length from the file's header, the name from its path
+				final name = StringTools.urlDecode(new js.html.URL(url, document.baseURI).pathname.split("/").pop());
+				final v = document.createVideoElement();
+				v.preload = "metadata";
+				new Promise((resolve, _) -> {
+					final done = () -> {
+						resolve(({title: name, duration: (v.duration > 0 && Math.isFinite(v.duration)) ? v.duration : null} : Info));
+						v.removeAttribute("src");
+						v.load(); // stops loading
+					}
+					v.onloadedmetadata = v.onerror = done;
+					window.setTimeout(done, 5000);
+					v.src = url;
+				});
 		}
 	}
 
